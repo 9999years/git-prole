@@ -1,0 +1,218 @@
+---
+# This workflow runs when PRs are merged and tags/builds/publishes a release.
+
+# Run when PRs to main are closed.
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main
+
+name: Build and publish a release
+
+jobs:
+  # We make `if_merged` a `needs:` of the other jobs here to only run this
+  # workflow on merged PRs.
+  if_merged:
+    name: Check that PR was merged and not closed
+    if: github.event.pull_request.merged == true
+      && contains(github.event.pull_request.labels.*.name, 'release')
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - run: |
+          echo "This is a canonical hack to run GitHub Actions on merged PRs"
+          echo "See: https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#running-your-pull_request-workflow-when-a-pull-request-merges"
+
+      - name: Comment on PR with link to this action
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            [This release is now being built.][run]
+
+            [run]: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+  version:
+    name: Get version number
+    needs: if_merged
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get_cargo_metadata.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - uses: cachix/install-nix-action@v22
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+          extra_nix_config: |
+            extra-experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Get version number
+        id: get_cargo_metadata
+        run: echo "version=$(nix run .#get-crate-version)" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Release Build
+    # Now we're ready to do the release build. In this step, we upload
+    # "artifacts" which lets us share files between jobs (the artifacts are
+    # downloaded by the next job, `upload`) and aggregate files from different
+    # parts of the matrix (so we can have the macOS and Linux executables in
+    # the next job).
+    needs: if_merged
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install rustup
+        uses: dtolnay/rust-toolchain@stable
+        if: runner.os == 'macOS'
+        with:
+          target: x86_64-apple-darwin, aarch64-apple-darwin
+
+      - uses: cachix/install-nix-action@v22
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+          extra_nix_config: |
+            extra-experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Log versions
+        if: runner.os == 'macOS'
+        run: which -a rustup && rustup --version
+
+      - name: Build (macOS, x86_64)
+        if: runner.os == 'macOS'
+        # Nix cross-compilation is broken on macOS, but cargo works fine.
+        # See: https://github.com/NixOS/nixpkgs/issues/180771
+        run: cargo build --release --target x86_64-apple-darwin
+
+      - name: Build (macOS, aarch64)
+        if: runner.os == 'macOS'
+        run: cargo build --release --target aarch64-apple-darwin
+
+      - name: Create macOS universal executable
+        if: runner.os == 'macOS'
+        run: |
+          lipo -create -output target/release/git-prole-macos \
+            target/x86_64-apple-darwin/release/git-prole \
+            target/aarch64-apple-darwin/release/git-prole
+
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install musl-tools
+
+      - name: Build (Linux, x86_64)
+        if: runner.os == 'Linux'
+        uses: houseabsolute/actions-rust-cross@v0
+        with:
+          command: build
+          target: x86_64-unknown-linux-musl
+          args: --release
+
+      - name: Build (Linux, aarch64)
+        if: runner.os == 'Linux'
+        uses: houseabsolute/actions-rust-cross@v0
+        with:
+          command: build
+          target: aarch64-unknown-linux-musl
+          args: --release
+
+      - name: Rename executables for upload
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p target/release
+          mv target/x86_64-unknown-linux-musl/release/git-prole \
+             target/release/git-prole-x86_64-linux
+          mv target/aarch64-unknown-linux-musl/release/git-prole \
+             target/release/git-prole-aarch64-linux
+
+      - name: Upload macOS executable
+        uses: actions/upload-artifact@v4
+        if: runner.os == 'macOS'
+        with:
+          name: macos
+          path: |
+            target/release/git-prole-macos
+
+      - name: Upload Linux executables
+        uses: actions/upload-artifact@v4
+        if: runner.os == 'Linux'
+        with:
+          name: linux
+          path: |
+            target/release/git-prole-x86_64-linux
+            target/release/git-prole-aarch64-linux
+
+      - name: Publish to crates.io
+        if: runner.os == 'Linux'
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          nix run .#cargo -- publish --no-verify
+
+  upload:
+    name: Upload assets to release
+    runs-on: ubuntu-latest
+    needs:
+      - if_merged
+      - build
+      - version
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Tag the release
+        uses: mathieudutour/github-tag-action@v6.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          commit_sha: ${{ github.event.pull_request.merge_commit_sha }}
+          custom_tag: ${{ needs.version.outputs.version }}
+
+      - name: Download artifacts
+        # This downloads the uploaded artifacts to the current directory; the
+        # path format for downloaded artifacts is `{name}/{basename}`, where
+        # `{basename}` is the basename of the upload `path`.
+        #
+        # For example, the following artifact:
+        #
+        #     - uses: actions/upload-artifact@v4
+        #       with:
+        #         name: linux
+        #         path: target/release/ghciwatch-aarch64-linux
+        #
+        # will be downloaded to `linux/ghciwatch-aarch64-linux`.
+        uses: actions/download-artifact@v4
+
+      - name: Create release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          tag_name: v${{ needs.version.outputs.version }}
+          files: |
+            linux/*
+            macos/*
+
+      - name: Comment on PR with link to the release
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            [Release ${{ needs.version.outputs.version }}][release] was built and published successfully!
+
+            [release]: ${{ steps.create_release.outputs.url }}
