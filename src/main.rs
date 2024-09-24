@@ -1,41 +1,23 @@
-mod cli;
-mod commit_hash;
-mod git;
-mod install_tracing;
-
-use clap::CommandFactory;
-use clap::Parser;
-use cli::Opts;
+use config::Config;
 use install_tracing::install_tracing;
 
-#[allow(unused_imports)]
-use miette::Context;
-#[allow(unused_imports)]
-use miette::IntoDiagnostic;
+mod add;
+mod app;
+mod cli;
+mod config;
+mod convert;
+mod copy_dir;
+mod current_dir;
+mod format_bulleted_list;
+mod gh;
+mod git;
+mod install_tracing;
+mod normal_path;
+mod topological_sort;
+mod utf8tempdir;
 
 fn main() -> miette::Result<()> {
-    let opts = Opts::parse();
-    install_tracing(&opts.log)?;
-
-    match opts.command {
-        cli::Command::Completions { shell } => {
-            let mut clap_command = cli::Opts::command();
-            clap_complete::generate(
-                shell,
-                &mut clap_command,
-                "git-prole",
-                &mut std::io::stdout(),
-            );
-        }
-        #[cfg(feature = "clap_mangen")]
-        cli::Command::Manpages { out_dir } => {
-            let clap_command = cli::Opts::command();
-            clap_mangen::generate_to(clap_command, out_dir)
-                .into_diagnostic()
-                .wrap_err("Failed to generate man pages")?;
-        }
-        cli::Command::Add {} => todo!(),
-    }
-
-    Ok(())
+    let config = Config::new()?;
+    install_tracing(&config.cli.log)?;
+    app::App::new(config).run()
 }
