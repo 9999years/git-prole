@@ -12,13 +12,14 @@
   installShellFiles,
   pkg-config,
   openssl,
-}: let
+  bash,
+  git,
+}:
+let
   src = lib.cleanSourceWith {
     src = craneLib.path ../../.;
     # Keep test data.
-    filter = path: type:
-      lib.hasInfix "/data" path
-      || (craneLib.filterCargoSources path type);
+    filter = path: type: lib.hasInfix "/data" path || (craneLib.filterCargoSources path type);
   };
 
   commonArgs' = {
@@ -42,35 +43,47 @@
   # all of that work (e.g. via cachix) when running in CI
   cargoArtifacts = craneLib.buildDepsOnly commonArgs';
 
-  commonArgs =
-    commonArgs'
-    // {
-      inherit cargoArtifacts;
-    };
+  commonArgs = commonArgs' // {
+    inherit cargoArtifacts;
+  };
 
   checks = {
-    git-prole-nextest = craneLib.cargoNextest (commonArgs
+    git-prole-nextest = craneLib.cargoNextest (
+      commonArgs
       // {
+        nativeBuildInputs = commonArgs.nativeBuildInputs ++ [
+          bash
+          git
+        ];
         NEXTEST_HIDE_PROGRESS_BAR = "true";
-      });
-    git-prole-doctest = craneLib.cargoTest (commonArgs
+      }
+    );
+    git-prole-doctest = craneLib.cargoTest (
+      commonArgs
       // {
-        cargoTestArgs = "--doc";
-      });
-    git-prole-clippy = craneLib.cargoClippy (commonArgs
+        cargoTestExtraArgs = "--doc";
+      }
+    );
+    git-prole-clippy = craneLib.cargoClippy (
+      commonArgs
       // {
         cargoClippyExtraArgs = "--all-targets -- --deny warnings";
-      });
-    git-prole-rustdoc = craneLib.cargoDoc (commonArgs
+      }
+    );
+    git-prole-rustdoc = craneLib.cargoDoc (
+      commonArgs
       // {
         cargoDocExtraArgs = "--document-private-items";
         RUSTDOCFLAGS = "-D warnings";
-      });
+      }
+    );
     git-prole-fmt = craneLib.cargoFmt commonArgs;
-    git-prole-audit = craneLib.cargoAudit (commonArgs
+    git-prole-audit = craneLib.cargoAudit (
+      commonArgs
       // {
         inherit (inputs) advisory-db;
-      });
+      }
+    );
   };
 
   devShell = craneLib.devShell {
@@ -94,7 +107,9 @@
     // {
       cargoExtraArgs = "${commonArgs.cargoExtraArgs or ""} --features clap_mangen";
 
-      nativeBuildInputs = commonArgs.nativeBuildInputs ++ [installShellFiles];
+      nativeBuildInputs = commonArgs.nativeBuildInputs ++ [ installShellFiles ];
+
+      doCheck = false;
 
       postInstall =
         (commonArgs.postInstall or "")
@@ -115,27 +130,31 @@
     }
   );
 in
-  # Build the actual crate itself, reusing the dependency
-  # artifacts from above.
-  craneLib.buildPackage (commonArgs
-    // {
-      # Don't run tests; we'll do that in a separate derivation.
-      doCheck = false;
+# Build the actual crate itself, reusing the dependency
+# artifacts from above.
+craneLib.buildPackage (
+  commonArgs
+  // {
+    # Don't run tests; we'll do that in a separate derivation.
+    doCheck = false;
 
-      postInstall =
-        (commonArgs.postInstall or "")
-        + ''
-          cp -r ${git-prole-man}/share $out/share
-          # What:
-          chmod -R +w $out/share
-        '';
+    postInstall =
+      (commonArgs.postInstall or "")
+      + ''
+        cp -r ${git-prole-man}/share $out/share
+        # For some reason this is needed to strip references:
+        #     stripping references to cargoVendorDir from share/man/man1/git-prole.1.gz
+        #     sed: couldn't open temporary file share/man/man1/sedwVs75O: Permission denied
+        chmod -R +w $out/share
+      '';
 
-      passthru = {
-        inherit
-          checks
-          devShell
-          commonArgs
-          craneLib
-          ;
-      };
-    })
+    passthru = {
+      inherit
+        checks
+        devShell
+        commonArgs
+        craneLib
+        ;
+    };
+  }
+)

@@ -1,3 +1,18 @@
+[workspace]
+members = [
+    "test-harness",
+]
+resolver = "2"
+
+# See: https://github.com/crate-ci/cargo-release/blob/master/docs/reference.md
+[workspace.metadata.release]
+# Set the commit message.
+pre-release-commit-message = "Release {{crate_name}} version {{version}}"
+consolidate-commits = false # One commit per crate.
+tag = false # Don't tag commits.
+push = false # Don't do `git push`.
+publish = false # Don't do `cargo publish`.
+
 [package]
 name = "git-prole"
 version = "0.1.0"
@@ -9,6 +24,9 @@ license = "MIT"
 keywords = ["git"]
 categories = ["command-line-utilities"]
 
+[lib]
+path = "src/lib.rs"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -18,19 +36,34 @@ clap = { version = "4.5.4", features = ["derive", "wrap_help", "env"] }
 clap_complete = "4.5.1"
 clap_mangen = { version = "0.2.20", optional = true }
 command-error = { version = "0.4.0", features = [ "tracing" ] }
+common-path = "1.0.0"
 derive_more = { version = "1.0.0", features = ["as_ref", "constructor", "deref", "deref_mut", "display", "from", "into"] }
 fs-err = "2.11.0"
+itertools = "0.13.0"
 miette = { version = "7.2.0", default-features = false, features = ["fancy-no-backtrace"] }
 owo-colors = { version = "4.0.0", features = ["supports-colors"] }
+path-absolutize = "3.1.1"
+pathdiff = { version = "0.2.1", features = ["camino"] }
 regex = "1.10.6"
+serde = { version = "1.0.210", features = ["derive"] }
+shell-words = "1.1.0"
+tap = "1.0.1"
+tempfile = "3.12.0"
+toml = "0.8.19"
 tracing = { version = "0.1.40", features = ["attributes"] }
 tracing-human-layer = "0.1.3"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter", "registry"] }
 utf8-command = "1.0.1"
+walkdir = "2.5.0"
+which = "6.0.3"
+winnow = "0.6.20"
+xdg = "2.5.2"
 
 [dev-dependencies]
+expect-test = "1.5.0"
 indoc = "2.0.5"
 pretty_assertions = "1.4.0"
+test-harness = { path = "test-harness" }
 
 # See: https://github.com/crate-ci/cargo-release/blob/master/docs/reference.md
 [package.metadata.release]
