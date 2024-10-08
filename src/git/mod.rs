@@ -546,4 +546,14 @@ impl Git {
             })
             .into_diagnostic()
     }
+
+    /// Set a local config setting.
+    #[expect(dead_code)]
+    pub fn set_config(&self, key: &str, value: &str) -> miette::Result<()> {
+        self.command()
+            .args(["config", "set", key, value])
+            .output_checked_utf8()
+            .into_diagnostic()?;
+        Ok(())
+    }
 }
