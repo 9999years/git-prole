@@ -5,7 +5,7 @@ use miette::miette;
 use miette::IntoDiagnostic;
 use which::which_global;
 
-use crate::app::App;
+use crate::app_git::AppGit;
 use crate::cli::CloneArgs;
 use crate::convert::ConvertPlan;
 use crate::convert::ConvertPlanOpts;
@@ -13,13 +13,13 @@ use crate::current_dir::current_dir_utf8;
 use crate::gh::looks_like_gh_url;
 use crate::git::repository_url_destination::repository_url_destination;
 
-pub fn clone(app: &App, args: CloneArgs) -> miette::Result<()> {
+pub fn clone(git: AppGit<'_>, args: CloneArgs) -> miette::Result<()> {
     let destination = match args.directory {
         Some(directory) => directory.to_owned(),
         None => current_dir_utf8()?.join(repository_url_destination(&args.repository)),
     };
 
-    if app.config.cli.dry_run {
+    if git.config.cli.dry_run {
         return Err(miette!("--dry-run is not supported for this command yet"));
     }
 
@@ -30,18 +30,16 @@ pub fn clone(app: &App, args: CloneArgs) -> miette::Result<()> {
             .status_checked()
             .into_diagnostic()?;
     } else {
-        app.git
-            .clone_repository(&args.repository, Some(&destination), &args.clone_args)?;
+        git.clone_repository(&args.repository, Some(&destination), &args.clone_args)?;
     }
 
     ConvertPlan::new(
-        app,
+        git,
         ConvertPlanOpts {
-            repository: destination,
             default_branch: None,
         },
     )?
-    .execute(app)?;
+    .execute()?;
 
     Ok(())
 }

@@ -11,25 +11,16 @@ use owo_colors::OwoColorize;
 use owo_colors::Stream;
 use tap::Tap;
 
-use crate::app::App;
+use crate::app_git::AppGit;
 use crate::cli::AddArgs;
 use crate::format_bulleted_list::format_bulleted_list;
 use crate::git::Git;
 use crate::normal_path::NormalPath;
 
-pub fn add(app: &App, args: AddArgs) -> miette::Result<()> {
-    // TODO: Check if there's more than 1 worktree and (offer to?) convert if not?
-    // TODO: Allow user to run commands, e.g. `direnv allow`?
-
-    let plan = WorktreePlan::new(app, &args, app.git.repo_root()?)?;
-    plan.execute(app)?;
-
-    Ok(())
-}
-
 /// A plan for creating a new `git worktree`.
 #[derive(Debug, Clone)]
-struct WorktreePlan {
+pub struct WorktreePlan<'a> {
+    git: AppGit<'a>,
     /// The directory to run commands from.
     repo_root: Utf8PathBuf,
     branch: BranchPlan,
@@ -39,17 +30,22 @@ struct WorktreePlan {
     copy_untracked: Vec<Utf8PathBuf>,
 }
 
-impl WorktreePlan {
-    pub fn new(app: &App, args: &AddArgs, repo_root: Utf8PathBuf) -> miette::Result<Self> {
-        let branch = BranchPlan::new(app, args)?;
-        let start_point = StartPointPlan::new(app, args, &branch)?;
-        let destination = Self::destination_plan(app, args, &branch)?;
-        let copy_untracked = if app.config.file.copy_untracked() {
-            app.git.untracked_files()?
+impl<'a> WorktreePlan<'a> {
+    pub fn new(git: AppGit<'a>, args: &'a AddArgs) -> miette::Result<Self> {
+        // TODO: Check if there's more than 1 worktree and (offer to?) convert if not?
+        // TODO: Allow user to run commands, e.g. `direnv allow`?
+
+        let repo_root = git.repo_root()?;
+        let branch = BranchPlan::new(&git, args)?;
+        let start_point = StartPointPlan::new(&git, args, &branch)?;
+        let destination = Self::destination_plan(&git, args, &branch)?;
+        let copy_untracked = if git.config.file.copy_untracked() {
+            git.untracked_files()?
         } else {
             Vec::new()
         };
         Ok(Self {
+            git,
             repo_root,
             branch,
             destination,
@@ -58,8 +54,8 @@ impl WorktreePlan {
         })
     }
 
-    pub fn destination_plan(
-        app: &App,
+    fn destination_plan(
+        git: &AppGit<'_>,
         args: &AddArgs,
         branch_plan: &BranchPlan,
     ) -> miette::Result<NormalPath> {
@@ -69,17 +65,15 @@ impl WorktreePlan {
                     NormalPath::from_cwd(name_or_path)
                 } else {
                     NormalPath::from_cwd(
-                        app.git
-                            .worktree_container()?
-                            .tap_mut(|p| p.push(name_or_path)),
+                        git.worktree_container()?.tap_mut(|p| p.push(name_or_path)),
                     )
                 }
             }
-            None => NormalPath::from_cwd(app.branch_path(branch_plan.branch_name())?),
+            None => NormalPath::from_cwd(git.branch_path(branch_plan.branch_name())?),
         }
     }
 
-    pub fn command(&self, git: &Git) -> Command {
+    fn command(&self, git: &Git) -> Command {
         let mut command = git.with_directory(self.repo_root.clone()).command();
         command.args(["worktree", "add"]);
 
@@ -100,7 +94,7 @@ impl WorktreePlan {
         command
     }
 
-    pub fn copy_untracked(&self) -> miette::Result<()> {
+    fn copy_untracked(&self) -> miette::Result<()> {
         if self.copy_untracked.is_empty() {
             return Ok(());
         }
@@ -126,12 +120,12 @@ impl WorktreePlan {
         Ok(())
     }
 
-    pub fn execute(&self, app: &App) -> miette::Result<()> {
-        let mut command = self.command(&app.git);
+    pub fn execute(&self) -> miette::Result<()> {
+        let mut command = self.command(&self.git);
 
         tracing::info!("{self}");
 
-        if app.config.cli.dry_run {
+        if self.git.config.cli.dry_run {
             tracing::info!("$ {}", Utf8ProgramAndArgs::from(&command));
         } else {
             command.status_checked().into_diagnostic()?;
@@ -141,7 +135,7 @@ impl WorktreePlan {
     }
 }
 
-impl Display for WorktreePlan {
+impl Display for WorktreePlan<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.branch {
             BranchPlan::Existing(_) => {
@@ -184,7 +178,7 @@ enum BranchPlan {
 }
 
 impl BranchPlan {
-    pub fn new(app: &App, args: &AddArgs) -> miette::Result<Self> {
+    pub fn new(git: &AppGit<'_>, args: &AddArgs) -> miette::Result<Self> {
         match (&args.inner.branch, &args.inner.force_branch) {
             (Some(_), Some(_)) => Err(miette!(
                 "`--branch` and `--force-branch` are mutually exclusive."
@@ -197,10 +191,10 @@ impl BranchPlan {
                     .name_or_path
                     .as_deref()
                     .expect("If `--branch` is not given, `NAME_OR_PATH` must be given");
-                let branch = App::branch_dirname(name_or_path);
-                if app.git.local_branch_exists(branch)? {
+                let branch = Git::branch_dirname(name_or_path);
+                if git.local_branch_exists(branch)? {
                     Ok(Self::Existing(branch.to_owned()))
-                } else if let Some(remote) = app.git.find_remote_for_branch(branch)? {
+                } else if let Some(remote) = git.find_remote_for_branch(branch)? {
                     // This is implicit behavior documented in `git-worktree(1)`.
                     Ok(Self::Existing(format!("{remote}/{branch}")))
                 } else {
@@ -253,12 +247,12 @@ enum StartPointPlan {
 }
 
 impl StartPointPlan {
-    pub fn new(app: &App, args: &AddArgs, branch_plan: &BranchPlan) -> miette::Result<Self> {
+    pub fn new(git: &AppGit<'_>, args: &AddArgs, branch_plan: &BranchPlan) -> miette::Result<Self> {
         match &args.commitish {
             Some(commitish) => Ok(Self::Explicit(commitish.to_owned())),
             None => match branch_plan {
                 BranchPlan::New(_) | BranchPlan::NewForce(_) => {
-                    Ok(Self::Default(app.pick_default_branch()?))
+                    Ok(Self::Default(git.preferred_branch()?))
                 }
                 BranchPlan::Existing(branch) => Ok(Self::Existing(branch.clone())),
             },

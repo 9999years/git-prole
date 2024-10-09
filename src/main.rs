@@ -3,6 +3,7 @@ use install_tracing::install_tracing;
 
 mod add;
 mod app;
+mod app_git;
 mod cli;
 mod clone;
 mod config;

@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::fmt::Debug;
 use std::process::Command;
 use std::str::FromStr;
 use std::sync::OnceLock;
@@ -15,6 +16,7 @@ use miette::IntoDiagnostic;
 use ref_name::Ref;
 use regex::Regex;
 use status::Status;
+use tap::Tap;
 use tracing::instrument;
 use utf8_command::Utf8Output;
 
@@ -29,30 +31,49 @@ pub mod worktree;
 use commit_hash::CommitHash;
 use worktree::Worktrees;
 
+use crate::app_git::AppGit;
+use crate::config::Config;
+use crate::current_dir::current_dir_utf8;
+
 /// `git` CLI wrapper.
-#[derive(Debug, Default, Clone)]
+#[derive(Clone)]
 pub struct Git {
-    current_dir: Option<Utf8PathBuf>,
+    current_dir: Utf8PathBuf,
+}
+
+impl Debug for Git {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Git").field(&self.current_dir).finish()
+    }
 }
 
 impl Git {
-    pub fn new() -> Self {
-        Default::default()
+    pub fn from_path(current_dir: Utf8PathBuf) -> Self {
+        Self { current_dir }
+    }
+
+    pub fn from_current_dir() -> miette::Result<Self> {
+        Ok(Self::from_path(current_dir_utf8()?))
+    }
+
+    pub fn with_config(self, config: &Config) -> AppGit<'_> {
+        AppGit { git: self, config }
     }
 
     /// Get a `git` command.
-    #[instrument(level = "trace")]
     pub fn command(&self) -> Command {
         let mut command = Command::new("git");
-        if let Some(current_dir) = &self.current_dir {
-            command.current_dir(current_dir);
-        }
+        command.current_dir(&self.current_dir);
         command
+    }
+
+    pub fn get_directory(&self) -> &Utf8Path {
+        &self.current_dir
     }
 
     /// Set the current working directory for `git` commands to be run in.
     pub fn set_directory(&mut self, path: Utf8PathBuf) {
-        self.current_dir = Some(path);
+        self.current_dir = path;
     }
 
     pub fn with_directory(&self, path: Utf8PathBuf) -> Self {
@@ -68,6 +89,7 @@ impl Git {
     }
 
     /// `git rev-parse --show-toplevel`
+    #[instrument(level = "trace")]
     pub fn repo_root(&self) -> miette::Result<Utf8PathBuf> {
         Ok(self
             .rev_parse_command()
@@ -81,6 +103,7 @@ impl Git {
     }
 
     /// Get a list of all `git remote`s.
+    #[instrument(level = "trace")]
     pub fn remotes(&self) -> miette::Result<Vec<String>> {
         Ok(self
             .command()
@@ -95,7 +118,7 @@ impl Git {
     }
 
     /// Get the (push) URL for the given remote.
-    #[expect(dead_code)]
+    #[expect(dead_code)] // #[instrument(level = "trace")]
     pub fn remote_url(&self, remote: &str) -> miette::Result<String> {
         Ok(self
             .command()
@@ -108,6 +131,7 @@ impl Git {
             .to_owned())
     }
 
+    #[instrument(level = "trace")]
     fn default_branch_symbolic_ref(&self, remote: &str) -> miette::Result<String> {
         let output = self
             .command()
@@ -142,6 +166,7 @@ impl Git {
         }
     }
 
+    #[instrument(level = "trace")]
     fn default_branch_ls_remote(&self, remote: &str) -> miette::Result<String> {
         let output = self
             .command()
@@ -185,6 +210,7 @@ impl Git {
         Ok(branch)
     }
 
+    #[instrument(level = "trace")]
     pub fn default_branch(&self, remote: &str) -> miette::Result<String> {
         self.default_branch_symbolic_ref(remote).or_else(|err| {
             tracing::debug!("Failed to get default branch: {err}");
@@ -192,7 +218,7 @@ impl Git {
         })
     }
 
-    #[expect(dead_code)]
+    #[expect(dead_code)] // #[instrument(level = "trace")]
     pub fn commit_message(&self, commit: &str) -> miette::Result<String> {
         Ok(self
             .command()
@@ -204,12 +230,13 @@ impl Git {
     }
 
     /// Get the `HEAD` commit hash.
+    #[instrument(level = "trace")]
     pub fn get_head(&self) -> miette::Result<CommitHash> {
         Ok(self.rev_parse("HEAD")?.expect("HEAD always exists"))
     }
 
     /// Get the `.git` directory path.
-    #[expect(dead_code)]
+    #[expect(dead_code)] // #[instrument(level = "trace")]
     pub fn get_git_dir(&self) -> miette::Result<Utf8PathBuf> {
         self.rev_parse_command()
             .arg("--git-dir")
@@ -219,6 +246,7 @@ impl Git {
     }
 
     /// Get the common `.git` directory for all worktrees.
+    #[instrument(level = "trace")]
     pub fn git_common_dir(&self) -> miette::Result<Utf8PathBuf> {
         self.rev_parse_command()
             .arg("--git-common-dir")
@@ -228,6 +256,7 @@ impl Git {
     }
 
     /// Parse a `commitish` into a commit hash.
+    #[instrument(level = "trace")]
     pub fn rev_parse(&self, commitish: &str) -> miette::Result<Option<CommitHash>> {
         self.rev_parse_command()
             .args(["--verify", "--quiet", "--end-of-options", commitish])
@@ -244,6 +273,7 @@ impl Git {
     }
 
     /// `git rev-parse --symbolic-full-name`
+    #[instrument(level = "trace")]
     pub fn rev_parse_symbolic_full_name(&self, commitish: &str) -> miette::Result<Option<Ref>> {
         self.rev_parse_command()
             .args([
@@ -271,7 +301,7 @@ impl Git {
     }
 
     /// Determine if a given `<commit-ish>` refers to a commit or a symbolic ref name.
-    #[expect(dead_code)]
+    #[expect(dead_code)] // #[instrument(level = "trace")]
     pub fn resolve_commitish(&self, commitish: &str) -> miette::Result<ResolvedCommitish> {
         match self.rev_parse_symbolic_full_name(commitish)? {
             Some(ref_name) => Ok(ResolvedCommitish::Ref(ref_name)),
@@ -287,6 +317,7 @@ impl Git {
     /// common `.git` directory.
     ///
     /// See: <https://stackoverflow.com/a/68754000>
+    #[instrument(level = "trace")]
     pub fn main_worktree(&self) -> miette::Result<Utf8PathBuf> {
         let mut worktree = self.git_common_dir()?;
         // This seems incredibly buggy, given that bare checkouts are a thing and Git has
@@ -305,6 +336,7 @@ impl Git {
     ///
     /// This is the main worktree's parent, and is usually where all the other worktrees are cloned
     /// as well.
+    #[instrument(level = "trace")]
     pub fn worktree_container(&self) -> miette::Result<Utf8PathBuf> {
         // TODO: Write `.git-prole` to indicate worktree container root?
         let mut container = self.main_worktree()?;
@@ -316,10 +348,12 @@ impl Git {
     }
 
     /// List Git worktrees.
+    #[instrument(level = "trace")]
     pub fn worktree_list(&self) -> miette::Result<Worktrees> {
         Worktrees::from_git(self)
     }
 
+    #[instrument(level = "trace")]
     pub fn is_head_detached(&self) -> miette::Result<bool> {
         let output = self
             .command()
@@ -330,7 +364,7 @@ impl Git {
         Ok(!output.status.success())
     }
 
-    #[expect(dead_code)]
+    #[expect(dead_code)] // #[instrument(level = "trace")]
     pub fn status(&self) -> miette::Result<Status> {
         self.command()
             .args(["status", "--porcelain=v1", "--ignored=traditional", "-z"])
@@ -345,6 +379,7 @@ impl Git {
     }
 
     /// Figure out what's going on with `HEAD`.
+    #[instrument(level = "trace")]
     pub fn head_kind(&self) -> miette::Result<HeadKind> {
         Ok(if self.is_head_detached()? {
             HeadKind::Detached(self.get_head()?)
@@ -357,6 +392,7 @@ impl Git {
     }
 
     /// List untracked files and directories.
+    #[instrument(level = "trace")]
     pub fn untracked_files(&self) -> miette::Result<Vec<Utf8PathBuf>> {
         Ok(self
             .command()
@@ -379,6 +415,7 @@ impl Git {
     }
 
     /// Lists local branches.
+    #[instrument(level = "trace")]
     pub fn list_local_branches(&self) -> miette::Result<HashSet<String>> {
         Ok(self
             .command()
@@ -391,6 +428,7 @@ impl Git {
             .collect())
     }
 
+    #[instrument(level = "trace")]
     pub fn local_branch_exists(&self, branch: &str) -> miette::Result<bool> {
         self.command()
             .args(["show-ref", "--quiet", "--branches", branch])
@@ -401,6 +439,7 @@ impl Git {
     }
 
     /// Get the `checkout.defaultRemote` setting.
+    #[instrument(level = "trace")]
     pub fn default_remote(&self) -> miette::Result<Option<String>> {
         self.get_config("checkout.defaultRemote")
     }
@@ -411,6 +450,7 @@ impl Git {
     ///
     /// This is (hopefully!) how Git determines which remote-tracking branch you want when you do a
     /// `git switch` or `git worktree add`.
+    #[instrument(level = "trace")]
     pub fn find_remote_for_branch(&self, branch: &str) -> miette::Result<Option<String>> {
         let refs = self
             .command()
@@ -453,6 +493,7 @@ impl Git {
         }
     }
 
+    #[instrument(level = "trace")]
     pub fn worktree_add(&self, path: &Utf8Path, commitish: &str) -> miette::Result<()> {
         self.command()
             .args(["worktree", "add", path.as_str(), commitish])
@@ -461,6 +502,7 @@ impl Git {
         Ok(())
     }
 
+    #[instrument(level = "trace")]
     pub fn worktree_add_no_checkout(&self, path: &Utf8Path, commitish: &str) -> miette::Result<()> {
         self.command()
             .args(["worktree", "add", "--no-checkout", path.as_str(), commitish])
@@ -469,6 +511,7 @@ impl Git {
         Ok(())
     }
 
+    #[instrument(level = "trace")]
     pub fn worktree_move(&self, from: &Utf8Path, to: &Utf8Path) -> miette::Result<()> {
         self.command()
             .current_dir(from)
@@ -478,6 +521,7 @@ impl Git {
         Ok(())
     }
 
+    #[instrument(level = "trace")]
     pub fn worktree_repair(&self) -> miette::Result<()> {
         self.command()
             .args(["worktree", "repair"])
@@ -486,6 +530,7 @@ impl Git {
         Ok(())
     }
 
+    #[instrument(level = "trace")]
     pub fn clone_repository(
         &self,
         repository: &str,
@@ -502,6 +547,7 @@ impl Git {
     }
 
     /// Get a config setting by name.
+    #[instrument(level = "trace")]
     pub fn get_config(&self, key: &str) -> miette::Result<Option<String>> {
         self.command()
             .args(["config", "get", "--null", key])
@@ -530,6 +576,7 @@ impl Git {
     }
 
     /// Set a local config setting.
+    #[instrument(level = "trace")]
     pub fn set_config(&self, key: &str, value: &str) -> miette::Result<()> {
         self.command()
             .args(["config", "set", key, value])
@@ -539,11 +586,43 @@ impl Git {
     }
 
     /// `git reset`.
+    #[instrument(level = "trace")]
     pub fn reset(&self) -> miette::Result<()> {
         self.command()
             .arg("reset")
             .output_checked_utf8()
             .into_diagnostic()?;
         Ok(())
+    }
+
+    /// The directory name, nested under the worktree parent directory, where the given
+    /// branch's worktree will be placed.
+    ///
+    /// E.g. to convert a repo `~/puppy` with default branch `main`, this will return `main`,
+    /// to indicate a worktree to be placed in `~/puppy/main`.
+    ///
+    /// TODO: Should support some configurable regex filtering or other logic?
+    pub fn branch_dirname(branch: &str) -> &str {
+        match branch.rsplit_once('/') {
+            Some((_left, right)) => {
+                tracing::warn!(
+                    %branch,
+                    worktree = %right,
+                    "Branch contains a `/`, using trailing component for worktree directory name"
+                );
+                right
+            }
+            None => branch,
+        }
+    }
+
+    /// Get the full path for a new worktree with the given branch name.
+    ///
+    /// This appends the [`Self::branch_dirname`] to the [`Git::worktree_container`].
+    #[instrument(level = "trace")]
+    pub fn branch_path(&self, branch: &str) -> miette::Result<Utf8PathBuf> {
+        Ok(self
+            .worktree_container()?
+            .tap_mut(|p| p.push(Self::branch_dirname(branch))))
     }
 }

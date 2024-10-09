@@ -1,6 +1,5 @@
 use std::fmt::Display;
 
-use camino::Utf8PathBuf;
 use fs_err as fs;
 use miette::miette;
 use miette::IntoDiagnostic;
@@ -8,7 +7,7 @@ use owo_colors::OwoColorize;
 use owo_colors::Stream;
 use tap::Tap;
 
-use crate::app::App;
+use crate::app_git::AppGit;
 use crate::format_bulleted_list::format_bulleted_list;
 use crate::git::Git;
 use crate::normal_path::NormalPath;
@@ -16,25 +15,24 @@ use crate::utf8tempdir::Utf8TempDir;
 
 #[derive(Debug)]
 pub struct ConvertPlanOpts {
-    pub repository: Utf8PathBuf,
     pub default_branch: Option<String>,
 }
 
 #[derive(Debug)]
-pub struct ConvertPlan {
+pub struct ConvertPlan<'a> {
+    git: AppGit<'a>,
     repo_name: String,
     steps: Vec<Step>,
-    git: Git,
 }
 
-impl Display for ConvertPlan {
+impl Display for ConvertPlan<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", format_bulleted_list(&self.steps))
     }
 }
 
-impl ConvertPlan {
-    pub fn new(app: &App, opts: ConvertPlanOpts) -> miette::Result<Self> {
+impl<'a> ConvertPlan<'a> {
+    pub fn new(git: AppGit<'a>, opts: ConvertPlanOpts) -> miette::Result<Self> {
         // Figuring out which worktrees to create is non-trivial:
         // - We might already have worktrees.
         // - We might have any number of remotes.
@@ -45,7 +43,6 @@ impl ConvertPlan {
         // - We might not be on _any_ branch.
 
         let tempdir = NormalPath::from_cwd(Utf8TempDir::new()?.into_path())?;
-        let git = app.git.with_directory(opts.repository);
         let worktrees = git.worktree_list()?;
 
         // TODO:
@@ -59,9 +56,9 @@ impl ConvertPlan {
 
         let default_branch = match opts.default_branch {
             Some(default_branch) => default_branch,
-            None => app.pick_default_branch()?,
+            None => git.preferred_branch()?,
         };
-        let default_branch_dirname = App::branch_dirname(&default_branch);
+        let default_branch_dirname = Git::branch_dirname(&default_branch);
         let head = git.head_kind()?;
         let worktree_dirname = head.branch_name().unwrap_or("work");
         // TODO: Is this sufficient if handling multiple worktrees?
@@ -153,10 +150,10 @@ impl ConvertPlan {
         })
     }
 
-    pub fn execute(&self, app: &App) -> miette::Result<()> {
+    pub fn execute(&self) -> miette::Result<()> {
         tracing::info!("{self}");
 
-        if app.config.cli.dry_run {
+        if self.git.config.cli.dry_run {
             return Ok(());
         }
 
