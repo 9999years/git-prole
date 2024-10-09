@@ -487,6 +487,14 @@ impl Git {
         Ok(())
     }
 
+    pub fn worktree_add_no_checkout(&self, path: &Utf8Path, commitish: &str) -> miette::Result<()> {
+        self.command()
+            .args(["worktree", "add", "--no-checkout", path.as_str(), commitish])
+            .status_checked()
+            .into_diagnostic()?;
+        Ok(())
+    }
+
     pub fn worktree_move(&self, from: &Utf8Path, to: &Utf8Path) -> miette::Result<()> {
         self.command()
             .current_dir(from)
@@ -548,10 +556,18 @@ impl Git {
     }
 
     /// Set a local config setting.
-    #[expect(dead_code)]
     pub fn set_config(&self, key: &str, value: &str) -> miette::Result<()> {
         self.command()
             .args(["config", "set", key, value])
+            .output_checked_utf8()
+            .into_diagnostic()?;
+        Ok(())
+    }
+
+    /// `git reset`.
+    pub fn reset(&self) -> miette::Result<()> {
+        self.command()
+            .arg("reset")
             .output_checked_utf8()
             .into_diagnostic()?;
         Ok(())

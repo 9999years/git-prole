@@ -46,18 +46,11 @@ impl ConvertPlan {
 
         let tempdir = NormalPath::from_cwd(Utf8TempDir::new()?.into_path())?;
         let git = app.git.with_directory(opts.repository);
-
-        let repo_root = NormalPath::from_cwd(git.repo_root()?)?;
-        let repo_name = repo_root
-            .file_name()
-            .ok_or_else(|| miette!("Repository has no basename: {repo_root}"))?;
         let worktrees = git.worktree_list()?;
-        let temp_repo_dir = tempdir.clone().tap_mut(|p| p.push(repo_name));
 
         // TODO:
         // - toposort worktrees
         // - resolve them all into unique directory names
-
         if worktrees.len() != 1 {
             return Err(miette!(
                 "Cannot convert a repository with multiple worktrees into a `git-prole` checkout:\n{worktrees}",
@@ -74,6 +67,23 @@ impl ConvertPlan {
         // TODO: Is this sufficient if handling multiple worktrees?
         let default_branch_is_checked_out = head.is_on_branch(&default_branch);
 
+        // The path of the repository/main worktree before we start meddling with it.
+        let repo_root = NormalPath::from_cwd(git.repo_root()?)?;
+        let repo_name = repo_root
+            .file_name()
+            .ok_or_else(|| miette!("Repository has no basename: {repo_root}"))?;
+        // The path of the `.git` directory before we start meddling with it.
+        let repo_git_dir = NormalPath::from_cwd(git.git_common_dir()?)?;
+        // The path where we'll put the main worktree once we're done meddling with it.
+        let repo_worktree = repo_root.clone().tap_mut(|p| p.push(worktree_dirname));
+
+        // The path in the `tempdir` where we'll place the `.git` directory while we're setting up
+        // worktrees.
+        let temp_git_dir = tempdir.clone().tap_mut(|p| p.push(".git"));
+        // The path in the `tempdir` where we'll place the current worktree while we
+        // reassociate it with the (now-bare) repository.
+        let temp_worktree = tempdir.clone().tap_mut(|p| p.push(worktree_dirname));
+
         // I don't know, what if you have `fix/main` (not a `fix` remote, but a
         // branch named `fix/main`!) checked out, and the default branch is `main`?
         if !default_branch_is_checked_out && worktree_dirname == default_branch_dirname {
@@ -82,56 +92,67 @@ impl ConvertPlan {
             );
         }
 
-        let new_root = repo_root
-            .clone()
-            .tap_mut(|p| p.push(default_branch_dirname));
-
-        let worktree_dir = repo_root.clone().tap_mut(|p| p.push(worktree_dirname));
-
         let mut steps = Vec::new();
 
-        if !default_branch_is_checked_out {
-            if !head.is_clean() {
-                steps.push(Step::StashPush {
-                    repo_root: repo_root.clone(),
-                });
-            }
+        steps.push(Step::MoveGitDir {
+            from: repo_git_dir.clone(),
+            to: temp_git_dir.clone(),
+        });
 
-            steps.push(Step::Switch {
-                repo_root: repo_root.clone(),
-                branch: default_branch.clone(),
-            });
-        }
+        steps.push(Step::SetConfig {
+            repo: temp_git_dir.clone(),
+            key: "core.bare".to_owned(),
+            value: "true".to_owned(),
+        });
 
-        steps.push(Step::MoveWorktree {
+        steps.push(Step::Move {
             from: repo_root.clone(),
-            to: temp_repo_dir.clone(),
-            // This will change when we support multiple worktrees!
-            is_main: true,
+            to: temp_worktree.clone(),
         });
 
         steps.push(Step::CreateDir {
             path: repo_root.clone(),
         });
-        steps.push(Step::MoveWorktree {
-            from: temp_repo_dir.clone(),
-            to: new_root.clone(),
-            // This will change when we support multiple worktrees!
-            is_main: true,
+
+        steps.push(Step::Move {
+            from: temp_git_dir.clone(),
+            to: repo_git_dir.clone(),
+        });
+
+        steps.push(Step::CreateWorktreeNoCheckout {
+            repo: repo_git_dir.clone(),
+            path: repo_worktree.clone(),
+            commitish: head.commitish().to_owned(),
+        });
+
+        steps.push(Step::Reset {
+            repo: repo_worktree.clone(),
+        });
+
+        steps.push(Step::Move {
+            from: repo_worktree.clone().tap_mut(|p| p.push(".git")),
+            to: temp_worktree.clone().tap_mut(|p| p.push(".git")),
+        });
+
+        steps.push(Step::RemoveDirectory {
+            path: repo_worktree.clone(),
+        });
+
+        steps.push(Step::Move {
+            from: temp_worktree.clone(),
+            to: repo_worktree.clone(),
         });
 
         if !default_branch_is_checked_out {
-            steps.push(Step::CreateWorktree {
-                repo_root: new_root.clone(),
-                path: worktree_dir.clone(),
-                commitish: head.commitish().to_owned(),
-            });
+            let default_branch_root = repo_root
+                .clone()
+                .tap_mut(|p| p.push(default_branch_dirname));
 
-            if !head.is_clean() {
-                steps.push(Step::StashPop {
-                    repo_root: worktree_dir.clone(),
-                });
-            }
+            steps.push(Step::CreateWorktree {
+                repo: repo_git_dir.clone(),
+                path: default_branch_root.clone(),
+                commitish: default_branch,
+            });
         }
 
         Ok(Self {
@@ -168,7 +189,7 @@ impl ConvertPlan {
                     fs::create_dir_all(path).into_diagnostic()?;
                 }
                 Step::CreateWorktree {
-                    repo_root,
+                    repo: repo_root,
                     path,
                     commitish,
                 } => {
@@ -180,6 +201,32 @@ impl ConvertPlan {
                     self.git
                         .with_directory(repo_root.as_path().to_owned())
                         .stash_pop()?;
+                }
+                Step::MoveGitDir { from, to } => {
+                    fs::rename(from, to).into_diagnostic()?;
+                }
+                Step::Move { from, to } => {
+                    fs::rename(from, to).into_diagnostic()?;
+                }
+                Step::SetConfig { repo, key, value } => {
+                    self.git
+                        .with_directory(repo.as_path().to_owned())
+                        .set_config(key, value)?;
+                }
+                Step::CreateWorktreeNoCheckout {
+                    repo,
+                    path,
+                    commitish,
+                } => {
+                    self.git
+                        .with_directory(repo.as_path().to_owned())
+                        .worktree_add_no_checkout(path, commitish)?;
+                }
+                Step::Reset { repo } => {
+                    self.git.with_directory(repo.as_path().to_owned()).reset()?;
+                }
+                Step::RemoveDirectory { path } => {
+                    fs::remove_dir(path).into_diagnostic()?;
                 }
             }
         }
@@ -196,6 +243,30 @@ impl ConvertPlan {
 
 #[derive(Debug, Clone)]
 pub enum Step {
+    MoveGitDir {
+        from: NormalPath,
+        to: NormalPath,
+    },
+    SetConfig {
+        repo: NormalPath,
+        key: String,
+        value: String,
+    },
+    Move {
+        from: NormalPath,
+        to: NormalPath,
+    },
+    CreateWorktreeNoCheckout {
+        repo: NormalPath,
+        path: NormalPath,
+        commitish: String,
+    },
+    Reset {
+        repo: NormalPath,
+    },
+    RemoveDirectory {
+        path: NormalPath,
+    },
     MoveWorktree {
         from: NormalPath,
         to: NormalPath,
@@ -212,7 +283,7 @@ pub enum Step {
         path: NormalPath,
     },
     CreateWorktree {
-        repo_root: NormalPath,
+        repo: NormalPath,
         path: NormalPath,
         commitish: String,
     },
@@ -247,7 +318,7 @@ impl Display for Step {
             Step::CreateWorktree {
                 path,
                 commitish,
-                repo_root,
+                repo: repo_root,
             } => {
                 write!(
                     f,
@@ -257,6 +328,37 @@ impl Display for Step {
             }
             Step::StashPop { repo_root } => {
                 write!(f, "In {repo_root}, restore changes")
+            }
+            Step::MoveGitDir { from, to } => {
+                write!(f, "Move {from} to {to}")
+            }
+            Step::SetConfig { repo, key, value } => {
+                write!(
+                    f,
+                    "In {repo}, set {}={}",
+                    key.if_supports_color(Stream::Stdout, |text| text.cyan()),
+                    value.if_supports_color(Stream::Stdout, |text| text.cyan()),
+                )
+            }
+            Step::Move { from, to } => {
+                write!(f, "Move {from} to {to}")
+            }
+            Step::CreateWorktreeNoCheckout {
+                repo,
+                commitish,
+                path,
+            } => {
+                write!(
+                    f,
+                    "In {repo}, create but don't check out a worktree for {} at {path}",
+                    commitish.if_supports_color(Stream::Stdout, |text| text.cyan()),
+                )
+            }
+            Step::Reset { repo } => {
+                write!(f, "In {repo}, reset the index state")
+            }
+            Step::RemoveDirectory { path } => {
+                write!(f, "Remove {path}")
             }
         }
     }
