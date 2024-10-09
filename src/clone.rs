@@ -7,7 +7,8 @@ use which::which_global;
 
 use crate::app::App;
 use crate::cli::CloneArgs;
-use crate::cli::ConvertArgs;
+use crate::convert::ConvertPlan;
+use crate::convert::ConvertPlanOpts;
 use crate::current_dir::current_dir_utf8;
 use crate::gh::looks_like_gh_url;
 use crate::git::repository_url_destination::repository_url_destination;
@@ -24,7 +25,7 @@ pub fn clone(app: &App, args: CloneArgs) -> miette::Result<()> {
 
     if looks_like_gh_url(&args.repository) && which_global("gh").is_ok() {
         Command::new("gh")
-            .args([&args.repository, destination.as_str()])
+            .args(["repo", "clone", &args.repository, destination.as_str()])
             .args(args.clone_args)
             .status_checked()
             .into_diagnostic()?;
@@ -33,9 +34,14 @@ pub fn clone(app: &App, args: CloneArgs) -> miette::Result<()> {
             .clone_repository(&args.repository, Some(&destination), &args.clone_args)?;
     }
 
-    app.convert(ConvertArgs {
-        default_branch: None,
-    })?;
+    ConvertPlan::new(
+        app,
+        ConvertPlanOpts {
+            repository: destination,
+            default_branch: None,
+        },
+    )?
+    .execute(app)?;
 
     Ok(())
 }

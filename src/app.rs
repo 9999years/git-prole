@@ -103,20 +103,14 @@ impl App {
     }
 
     pub fn convert(&self, args: ConvertArgs) -> miette::Result<()> {
-        let plan = ConvertPlan::new(
+        ConvertPlan::new(
             self,
             ConvertPlanOpts {
                 repository: current_dir_utf8()?,
                 default_branch: args.default_branch,
             },
-        )?;
-
-        tracing::info!("{plan}");
-
-        // TODO: Ask the user before we start messing around with their repo layout!
-        if !self.config.cli.dry_run {
-            plan.execute()?;
-        }
+        )?
+        .execute(self)?;
 
         Ok(())
     }

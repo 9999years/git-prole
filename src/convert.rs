@@ -153,7 +153,15 @@ impl ConvertPlan {
         })
     }
 
-    pub fn execute(&self) -> miette::Result<()> {
+    pub fn execute(&self, app: &App) -> miette::Result<()> {
+        tracing::info!("{self}");
+
+        if app.config.cli.dry_run {
+            return Ok(());
+        }
+
+        // TODO: Ask the user before we start messing around with their repo layout!
+
         for step in &self.steps {
             tracing::debug!(%step, "Performing step");
             match step {

@@ -7,10 +7,10 @@ pub fn looks_like_gh_url(url: &str) -> bool {
     RE.get_or_init(|| {
         Regex::new(
             r"(?xm)
-                    ^
-                    [[:word:]]{1,39}(/[[:word:]]+)?
-                    $
-                    ",
+            ^
+            [a-zA-Z0-9_-]{1,39}(/[a-zA-Z0-9_-]+)?
+            $
+            ",
         )
         .expect("Regex parses")
     })
