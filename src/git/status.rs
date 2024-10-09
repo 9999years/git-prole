@@ -112,6 +112,7 @@ pub struct Status {
 }
 
 impl Status {
+    #[expect(dead_code)]
     pub fn is_clean(&self) -> bool {
         self.entries.iter().all(|entry| !entry.is_modified())
     }

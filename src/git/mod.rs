@@ -8,7 +8,6 @@ use camino::Utf8PathBuf;
 use command_error::CommandExt;
 use command_error::OutputContext;
 use commitish::ResolvedCommitish;
-use head_state::Head;
 use head_state::HeadKind;
 use miette::miette;
 use miette::Context;
@@ -331,22 +330,7 @@ impl Git {
         Ok(!output.status.success())
     }
 
-    pub fn stash_push(&self) -> miette::Result<()> {
-        self.command()
-            .args(["stash", "push", "--all"])
-            .output_checked_utf8()
-            .into_diagnostic()?;
-        Ok(())
-    }
-
-    pub fn stash_pop(&self) -> miette::Result<()> {
-        self.command()
-            .args(["stash", "pop", "--all"])
-            .output_checked_utf8()
-            .into_diagnostic()?;
-        Ok(())
-    }
-
+    #[expect(dead_code)]
     pub fn status(&self) -> miette::Result<Status> {
         self.command()
             .args(["status", "--porcelain=v1", "--ignored=traditional", "-z"])
@@ -361,17 +345,15 @@ impl Git {
     }
 
     /// Figure out what's going on with `HEAD`.
-    pub fn head_state(&self) -> miette::Result<Head> {
-        let status = self.status()?;
-        let kind = if self.is_head_detached()? {
+    pub fn head_kind(&self) -> miette::Result<HeadKind> {
+        Ok(if self.is_head_detached()? {
             HeadKind::Detached(self.get_head()?)
         } else {
             HeadKind::Ref(
                 self.rev_parse_symbolic_full_name("HEAD")?
                     .expect("HEAD should always be a valid ref"),
             )
-        };
-        Ok(Head { status, kind })
+        })
     }
 
     /// List untracked files and directories.
@@ -469,14 +451,6 @@ impl Git {
         } else {
             Ok(None)
         }
-    }
-
-    pub fn switch(&self, branch: &str) -> miette::Result<()> {
-        self.command()
-            .args(["switch", branch])
-            .status_checked()
-            .into_diagnostic()?;
-        Ok(())
     }
 
     pub fn worktree_add(&self, path: &Utf8Path, commitish: &str) -> miette::Result<()> {

@@ -62,7 +62,7 @@ impl ConvertPlan {
             None => app.pick_default_branch()?,
         };
         let default_branch_dirname = App::branch_dirname(&default_branch);
-        let head = git.head_state()?;
+        let head = git.head_kind()?;
         let worktree_dirname = head.branch_name().unwrap_or("work");
         // TODO: Is this sufficient if handling multiple worktrees?
         let default_branch_is_checked_out = head.is_on_branch(&default_branch);
@@ -92,56 +92,47 @@ impl ConvertPlan {
             );
         }
 
-        let mut steps = Vec::new();
-
-        steps.push(Step::MoveGitDir {
-            from: repo_git_dir.clone(),
-            to: temp_git_dir.clone(),
-        });
-
-        steps.push(Step::SetConfig {
-            repo: temp_git_dir.clone(),
-            key: "core.bare".to_owned(),
-            value: "true".to_owned(),
-        });
-
-        steps.push(Step::Move {
-            from: repo_root.clone(),
-            to: temp_worktree.clone(),
-        });
-
-        steps.push(Step::CreateDir {
-            path: repo_root.clone(),
-        });
-
-        steps.push(Step::Move {
-            from: temp_git_dir.clone(),
-            to: repo_git_dir.clone(),
-        });
-
-        steps.push(Step::CreateWorktreeNoCheckout {
-            repo: repo_git_dir.clone(),
-            path: repo_worktree.clone(),
-            commitish: head.commitish().to_owned(),
-        });
-
-        steps.push(Step::Reset {
-            repo: repo_worktree.clone(),
-        });
-
-        steps.push(Step::Move {
-            from: repo_worktree.clone().tap_mut(|p| p.push(".git")),
-            to: temp_worktree.clone().tap_mut(|p| p.push(".git")),
-        });
-
-        steps.push(Step::RemoveDirectory {
-            path: repo_worktree.clone(),
-        });
-
-        steps.push(Step::Move {
-            from: temp_worktree.clone(),
-            to: repo_worktree.clone(),
-        });
+        let mut steps = vec![
+            Step::Move {
+                from: repo_git_dir.clone(),
+                to: temp_git_dir.clone(),
+            },
+            Step::SetConfig {
+                repo: temp_git_dir.clone(),
+                key: "core.bare".to_owned(),
+                value: "true".to_owned(),
+            },
+            Step::Move {
+                from: repo_root.clone(),
+                to: temp_worktree.clone(),
+            },
+            Step::CreateDir {
+                path: repo_root.clone(),
+            },
+            Step::Move {
+                from: temp_git_dir.clone(),
+                to: repo_git_dir.clone(),
+            },
+            Step::CreateWorktreeNoCheckout {
+                repo: repo_git_dir.clone(),
+                path: repo_worktree.clone(),
+                commitish: head.commitish().to_owned(),
+            },
+            Step::Reset {
+                repo: repo_worktree.clone(),
+            },
+            Step::Move {
+                from: repo_worktree.clone().tap_mut(|p| p.push(".git")),
+                to: temp_worktree.clone().tap_mut(|p| p.push(".git")),
+            },
+            Step::RemoveDirectory {
+                path: repo_worktree.clone(),
+            },
+            Step::Move {
+                from: temp_worktree.clone(),
+                to: repo_worktree.clone(),
+            },
+        ];
 
         if !default_branch_is_checked_out {
             let default_branch_root = repo_root
@@ -177,14 +168,6 @@ impl ConvertPlan {
                         self.git.worktree_move(from, to)?;
                     }
                 }
-                Step::StashPush { repo_root } => self
-                    .git
-                    .with_directory(repo_root.as_path().to_owned())
-                    .stash_push()?,
-                Step::Switch { repo_root, branch } => self
-                    .git
-                    .with_directory(repo_root.as_path().to_owned())
-                    .switch(branch)?,
                 Step::CreateDir { path } => {
                     fs::create_dir_all(path).into_diagnostic()?;
                 }
@@ -196,14 +179,6 @@ impl ConvertPlan {
                     self.git
                         .with_directory(repo_root.as_path().to_owned())
                         .worktree_add(path.as_path(), commitish)?;
-                }
-                Step::StashPop { repo_root } => {
-                    self.git
-                        .with_directory(repo_root.as_path().to_owned())
-                        .stash_pop()?;
-                }
-                Step::MoveGitDir { from, to } => {
-                    fs::rename(from, to).into_diagnostic()?;
                 }
                 Step::Move { from, to } => {
                     fs::rename(from, to).into_diagnostic()?;
@@ -243,7 +218,7 @@ impl ConvertPlan {
 
 #[derive(Debug, Clone)]
 pub enum Step {
-    MoveGitDir {
+    Move {
         from: NormalPath,
         to: NormalPath,
     },
@@ -251,10 +226,6 @@ pub enum Step {
         repo: NormalPath,
         key: String,
         value: String,
-    },
-    Move {
-        from: NormalPath,
-        to: NormalPath,
     },
     CreateWorktreeNoCheckout {
         repo: NormalPath,
@@ -267,17 +238,12 @@ pub enum Step {
     RemoveDirectory {
         path: NormalPath,
     },
+    /// Will be needed for multiple worktree support.
+    #[expect(dead_code)]
     MoveWorktree {
         from: NormalPath,
         to: NormalPath,
         is_main: bool,
-    },
-    StashPush {
-        repo_root: NormalPath,
-    },
-    Switch {
-        repo_root: NormalPath,
-        branch: String,
     },
     CreateDir {
         path: NormalPath,
@@ -286,9 +252,6 @@ pub enum Step {
         repo: NormalPath,
         path: NormalPath,
         commitish: String,
-    },
-    StashPop {
-        repo_root: NormalPath,
     },
 }
 
@@ -301,16 +264,6 @@ impl Display for Step {
                 is_main: _,
             } => {
                 write!(f, "Move {from} to {to}")
-            }
-            Step::StashPush { repo_root } => {
-                write!(f, "In {repo_root}, stash changes")
-            }
-            Step::Switch { repo_root, branch } => {
-                write!(
-                    f,
-                    "In {repo_root}, switch to branch {}",
-                    branch.if_supports_color(Stream::Stdout, |branch| branch.cyan())
-                )
             }
             Step::CreateDir { path } => {
                 write!(f, "Create directory {path}")
@@ -325,12 +278,6 @@ impl Display for Step {
                     "In {repo_root}, create a worktree for {} at {path}",
                     commitish.if_supports_color(Stream::Stdout, |branch| branch.cyan())
                 )
-            }
-            Step::StashPop { repo_root } => {
-                write!(f, "In {repo_root}, restore changes")
-            }
-            Step::MoveGitDir { from, to } => {
-                write!(f, "Move {from} to {to}")
             }
             Step::SetConfig { repo, key, value } => {
                 write!(
