@@ -1,15 +1,12 @@
 use std::collections::HashSet;
-use std::process::Command;
 
 use calm_io::stdout;
 use camino::Utf8PathBuf;
 use clap::CommandFactory;
-use command_error::CommandExt;
 use fs_err as fs;
 use miette::miette;
 use miette::IntoDiagnostic;
 use tap::Tap;
-use which::which_global;
 
 use crate::cli;
 use crate::cli::AddArgs;
@@ -21,8 +18,6 @@ use crate::config::Config;
 use crate::convert::ConvertPlan;
 use crate::convert::ConvertPlanOpts;
 use crate::current_dir::current_dir_utf8;
-use crate::gh::looks_like_gh_url;
-use crate::git::repository_url_destination::repository_url_destination;
 use crate::git::Git;
 
 pub struct App {
@@ -104,33 +99,10 @@ impl App {
     }
 
     fn clone(&self, args: CloneArgs) -> miette::Result<()> {
-        let destination = match args.directory {
-            Some(directory) => directory.to_owned(),
-            None => current_dir_utf8()?.join(repository_url_destination(&args.repository)),
-        };
-
-        if self.config.cli.dry_run {
-            return Err(miette!("--dry-run is not supported for this command yet"));
-        }
-
-        if looks_like_gh_url(&args.repository) && which_global("gh").is_ok() {
-            Command::new("gh")
-                .args([&args.repository, destination.as_str()])
-                .args(args.clone_args)
-                .status_checked()
-                .into_diagnostic()?;
-        } else {
-            self.git
-                .clone_repository(&args.repository, Some(&destination), &args.clone_args)?;
-        }
-
-        self.convert(ConvertArgs {
-            default_branch: None,
-        })?;
-        Ok(())
+        crate::clone::clone(self, args)
     }
 
-    fn convert(&self, args: ConvertArgs) -> miette::Result<()> {
+    pub fn convert(&self, args: ConvertArgs) -> miette::Result<()> {
         let plan = ConvertPlan::new(
             self,
             ConvertPlanOpts {

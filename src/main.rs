@@ -4,6 +4,7 @@ use install_tracing::install_tracing;
 mod add;
 mod app;
 mod cli;
+mod clone;
 mod config;
 mod convert;
 mod copy_dir;
