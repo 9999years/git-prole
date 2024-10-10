@@ -1,3 +1,18 @@
+[workspace]
+members = [
+    "test-harness",
+]
+resolver = "2"
+
+# See: https://github.com/crate-ci/cargo-release/blob/master/docs/reference.md
+[workspace.metadata.release]
+# Set the commit message.
+pre-release-commit-message = "Release {{crate_name}} version {{version}}"
+consolidate-commits = false # One commit per crate.
+tag = false # Don't tag commits.
+push = false # Don't do `git push`.
+publish = false # Don't do `cargo publish`.
+
 [package]
 name = "git-prole"
 version = "0.1.0"
@@ -43,6 +58,7 @@ xdg = "2.5.2"
 [dev-dependencies]
 indoc = "2.0.5"
 pretty_assertions = "1.4.0"
+test-harness = { path = "test-harness" }
 
 # See: https://github.com/crate-ci/cargo-release/blob/master/docs/reference.md
 [package.metadata.release]

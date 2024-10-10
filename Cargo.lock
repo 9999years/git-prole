@@ -187,6 +187,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "clonable-command"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a94c477ad2f0c0b2772d1c1260972081012cf09d813f8d6ac26144658eed2bcd"
+
+[[package]]
 name = "colorchoice"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -306,6 +312,7 @@ dependencies = [
  "shell-words",
  "tap",
  "tempfile",
+ "test-harness",
  "toml",
  "tracing",
  "tracing-human-layer",
@@ -881,9 +888,9 @@ checksum = "55937e1799185b12863d447f42597ed69d9928686b8d88a1df17376a097d8369"
 
 [[package]]
 name = "tempfile"
-version = "3.12.0"
+version = "3.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04cbcdd0c794ebb0d4cf35e88edd2f7d2c4c3e9a5a6dab322839b321c6a87a64"
+checksum = "f0f2c9fc62d0beef6951ccffd757e241266a2c833136efbe35af6cd2567dca5b"
 dependencies = [
  "cfg-if",
  "fastrand",
@@ -911,6 +918,29 @@ dependencies = [
  "rustix 0.38.37",
  "windows-sys 0.48.0",
 ]
+
+[[package]]
+name = "test-harness"
+version = "0.1.0"
+dependencies = [
+ "camino",
+ "clonable-command",
+ "command-error",
+ "git-prole",
+ "itertools 0.13.0",
+ "miette",
+ "regex",
+ "tempfile",
+ "test_bin",
+ "tracing",
+ "utf8-command",
+]
+
+[[package]]
+name = "test_bin"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e7a7de15468c6e65dd7db81cf3822c1ec94c71b2a3c1a976ea8e4696c91115c"
 
 [[package]]
 name = "textwrap"
