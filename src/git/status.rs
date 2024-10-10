@@ -1,8 +1,71 @@
+use std::fmt::Debug;
 use std::iter;
 use std::str::FromStr;
 
 use camino::Utf8PathBuf;
+use command_error::CommandExt;
+use command_error::OutputContext;
 use miette::miette;
+use miette::IntoDiagnostic;
+use tracing::instrument;
+use utf8_command::Utf8Output;
+
+use super::Git;
+
+/// Git methods for dealing with statuses and the working tree.
+#[repr(transparent)]
+pub struct GitStatus<'a>(&'a Git);
+
+impl Debug for GitStatus<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Debug::fmt(self.0, f)
+    }
+}
+
+impl<'a> GitStatus<'a> {
+    pub fn new(git: &'a Git) -> Self {
+        Self(git)
+    }
+
+    #[expect(dead_code)] // #[instrument(level = "trace")]
+    pub fn get(&self) -> miette::Result<Status> {
+        self.0
+            .command()
+            .args(["status", "--porcelain=v1", "--ignored=traditional", "-z"])
+            .output_checked_as(|context: OutputContext<Utf8Output>| {
+                if context.status().success() {
+                    Status::from_str(&context.output().stdout).map_err(|err| context.error_msg(err))
+                } else {
+                    Err(context.error())
+                }
+            })
+            .into_diagnostic()
+    }
+
+    /// List untracked files and directories.
+    #[instrument(level = "trace")]
+    pub fn untracked_files(&self) -> miette::Result<Vec<Utf8PathBuf>> {
+        Ok(self
+            .0
+            .command()
+            .args([
+                "ls-files",
+                // Show untracked (e.g. ignored) files.
+                "--others",
+                // If a whole directory is classified as other, show just its name and not its
+                // whole contents.
+                "--directory",
+                "-z",
+            ])
+            .output_checked_utf8()
+            .into_diagnostic()?
+            .stdout
+            .split('\0')
+            .filter(|path| !path.is_empty())
+            .map(Utf8PathBuf::from)
+            .collect())
+    }
+}
 
 /// The status code of a particular file. Each [`StatusEntry`] has two of these.
 #[derive(Debug, Clone, Copy)]

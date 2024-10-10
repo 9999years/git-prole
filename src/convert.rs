@@ -9,7 +9,6 @@ use tap::Tap;
 
 use crate::app_git::AppGit;
 use crate::format_bulleted_list::format_bulleted_list;
-use crate::git::Git;
 use crate::normal_path::NormalPath;
 use crate::utf8tempdir::Utf8TempDir;
 
@@ -43,7 +42,7 @@ impl<'a> ConvertPlan<'a> {
         // - We might not be on _any_ branch.
 
         let tempdir = NormalPath::from_cwd(Utf8TempDir::new()?.into_path())?;
-        let worktrees = git.worktree_list()?;
+        let worktrees = git.worktree().list()?;
 
         // TODO:
         // - toposort worktrees
@@ -58,19 +57,19 @@ impl<'a> ConvertPlan<'a> {
             Some(default_branch) => default_branch,
             None => git.preferred_branch()?,
         };
-        let default_branch_dirname = Git::branch_dirname(&default_branch);
-        let head = git.head_kind()?;
+        let default_branch_dirname = git.worktree().dirname_for(&default_branch);
+        let head = git.refs().head_kind()?;
         let worktree_dirname = head.branch_name().unwrap_or("work");
         // TODO: Is this sufficient if handling multiple worktrees?
         let default_branch_is_checked_out = head.is_on_branch(&default_branch);
 
         // The path of the repository/main worktree before we start meddling with it.
-        let repo_root = NormalPath::from_cwd(git.repo_root()?)?;
+        let repo_root = NormalPath::from_cwd(git.path().repo_root()?)?;
         let repo_name = repo_root
             .file_name()
             .ok_or_else(|| miette!("Repository has no basename: {repo_root}"))?;
         // The path of the `.git` directory before we start meddling with it.
-        let repo_git_dir = NormalPath::from_cwd(git.git_common_dir()?)?;
+        let repo_git_dir = NormalPath::from_cwd(git.path().git_common_dir()?)?;
         // The path where we'll put the main worktree once we're done meddling with it.
         let repo_worktree = repo_root.clone().tap_mut(|p| p.push(worktree_dirname));
 
@@ -168,9 +167,10 @@ impl<'a> ConvertPlan<'a> {
                         fs::rename(from, to).into_diagnostic()?;
                         self.git
                             .with_directory(to.as_path().to_owned())
-                            .worktree_repair()?;
+                            .worktree()
+                            .repair()?;
                     } else {
-                        self.git.worktree_move(from, to)?;
+                        self.git.worktree().rename(from, to)?;
                     }
                 }
                 Step::CreateDir { path } => {
@@ -183,7 +183,8 @@ impl<'a> ConvertPlan<'a> {
                 } => {
                     self.git
                         .with_directory(repo_root.as_path().to_owned())
-                        .worktree_add(path.as_path(), commitish)?;
+                        .worktree()
+                        .add(path.as_path(), commitish)?;
                 }
                 Step::Move { from, to } => {
                     fs::rename(from, to).into_diagnostic()?;
@@ -191,7 +192,8 @@ impl<'a> ConvertPlan<'a> {
                 Step::SetConfig { repo, key, value } => {
                     self.git
                         .with_directory(repo.as_path().to_owned())
-                        .set_config(key, value)?;
+                        .config()
+                        .set(key, value)?;
                 }
                 Step::CreateWorktreeNoCheckout {
                     repo,
@@ -200,7 +202,8 @@ impl<'a> ConvertPlan<'a> {
                 } => {
                     self.git
                         .with_directory(repo.as_path().to_owned())
-                        .worktree_add_no_checkout(path, commitish)?;
+                        .worktree()
+                        .add_no_checkout(path, commitish)?;
                 }
                 Step::Reset { repo } => {
                     self.git.with_directory(repo.as_path().to_owned()).reset()?;

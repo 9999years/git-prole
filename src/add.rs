@@ -35,12 +35,12 @@ impl<'a> WorktreePlan<'a> {
         // TODO: Check if there's more than 1 worktree and (offer to?) convert if not?
         // TODO: Allow user to run commands, e.g. `direnv allow`?
 
-        let repo_root = git.repo_root()?;
+        let repo_root = git.path().repo_root()?;
         let branch = BranchPlan::new(&git, args)?;
         let start_point = StartPointPlan::new(&git, args, &branch)?;
         let destination = Self::destination_plan(&git, args, &branch)?;
         let copy_untracked = if git.config.file.copy_untracked() {
-            git.untracked_files()?
+            git.status().untracked_files()?
         } else {
             Vec::new()
         };
@@ -65,11 +65,13 @@ impl<'a> WorktreePlan<'a> {
                     NormalPath::from_cwd(name_or_path)
                 } else {
                     NormalPath::from_cwd(
-                        git.worktree_container()?.tap_mut(|p| p.push(name_or_path)),
+                        git.worktree()
+                            .container()?
+                            .tap_mut(|p| p.push(name_or_path)),
                     )
                 }
             }
-            None => NormalPath::from_cwd(git.branch_path(branch_plan.branch_name())?),
+            None => NormalPath::from_cwd(git.worktree().path_for(branch_plan.branch_name())?),
         }
     }
 
@@ -191,10 +193,10 @@ impl BranchPlan {
                     .name_or_path
                     .as_deref()
                     .expect("If `--branch` is not given, `NAME_OR_PATH` must be given");
-                let branch = Git::branch_dirname(name_or_path);
-                if git.local_branch_exists(branch)? {
+                let branch = git.worktree().dirname_for(name_or_path);
+                if git.branch().exists_local(branch)? {
                     Ok(Self::Existing(branch.to_owned()))
-                } else if let Some(remote) = git.find_remote_for_branch(branch)? {
+                } else if let Some(remote) = git.remote().for_branch(branch)? {
                     // This is implicit behavior documented in `git-worktree(1)`.
                     Ok(Self::Existing(format!("{remote}/{branch}")))
                 } else {

@@ -5,6 +5,7 @@
 use fs_err as fs;
 use std::io::{Error, ErrorKind, Result};
 use std::path::Path;
+use tracing::instrument;
 
 macro_rules! push_error {
     ($expr:expr, $vec:ident) => {
@@ -62,6 +63,7 @@ macro_rules! make_err {
 ///   twice.
 /// * Filesystem boundaries may be crossed.
 /// * Symbolic links will be copied, not followed.
+#[instrument(level = "trace", skip_all)]
 pub fn copy_dir<Q: AsRef<Path>, P: AsRef<Path>>(from: P, to: Q) -> Result<Vec<Error>> {
     if !from.as_ref().exists() {
         return Err(make_err!("source path does not exist", ErrorKind::NotFound));
