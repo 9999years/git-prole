@@ -2,6 +2,10 @@ use std::fmt::Display;
 use std::str::FromStr;
 
 use miette::miette;
+use winnow::combinator::rest;
+use winnow::token::take_till;
+use winnow::PResult;
+use winnow::Parser;
 
 /// A Git ref (a file under `refs`).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -61,24 +65,30 @@ impl Ref {
             None
         }
     }
-}
 
-impl FromStr for Ref {
-    type Err = miette::Report;
+    /// Parse a ref name like `refs/puppy/doggy`.
+    ///
+    /// Needs at least one slash after `refs/`; this does not treat `refs/puppy` as a valid ref
+    /// name.
+    pub fn parser(input: &mut &str) -> PResult<Self> {
+        let _refs_prefix = "refs/".parse_next(input)?;
 
-    fn from_str(original: &str) -> Result<Self, Self::Err> {
-        let rest = original
-            .strip_prefix("refs/")
-            .ok_or_else(|| miette!("Refs must start with `refs/`: {original}"))?;
-
-        let (kind, name) = rest.split_once('/').ok_or_else(|| {
-            miette!("Ref names should have at least one `/` after `refs/`: {original}")
-        })?;
+        let kind = take_till(1.., '/').parse_next(input)?;
+        let _ = '/'.parse_next(input)?;
+        let name = rest.parse_next(input)?;
 
         Ok(Self {
             kind: kind.to_owned(),
             name: name.to_owned(),
         })
+    }
+}
+
+impl FromStr for Ref {
+    type Err = miette::Report;
+
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        Self::parser.parse(input).map_err(|err| miette!("{err}"))
     }
 }
 
@@ -89,5 +99,37 @@ impl Display for Ref {
         } else {
             write!(f, "{}", self.name)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ref_parse_no_slash() {
+        assert!(Ref::from_str("refs/puppy").is_err());
+    }
+
+    #[test]
+    fn test_ref_parse_simple() {
+        assert_eq!(
+            Ref::from_str("refs/puppy/doggy").unwrap(),
+            Ref {
+                kind: "puppy".into(),
+                name: "doggy".into()
+            }
+        );
+    }
+
+    #[test]
+    fn test_ref_parse_multiple_slashes() {
+        assert_eq!(
+            Ref::from_str("refs/puppy/doggy/softie/cutie").unwrap(),
+            Ref {
+                kind: "puppy".into(),
+                name: "doggy/softie/cutie".into()
+            }
+        );
     }
 }

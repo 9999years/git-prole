@@ -19,6 +19,7 @@ mod gh;
 mod git;
 mod install_tracing;
 mod normal_path;
+mod parse;
 mod topological_sort;
 mod utf8tempdir;
 

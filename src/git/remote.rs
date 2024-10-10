@@ -1,13 +1,17 @@
 use std::fmt::Debug;
 use std::str::FromStr;
-use std::sync::OnceLock;
 
 use command_error::CommandExt;
+use command_error::OutputContext;
 use miette::miette;
 use miette::Context;
 use miette::IntoDiagnostic;
-use regex::Regex;
 use tracing::instrument;
+use utf8_command::Utf8Output;
+use winnow::combinator::rest;
+use winnow::token::take_till;
+use winnow::PResult;
+use winnow::Parser;
 
 use super::ref_name::Ref;
 use super::Git;
@@ -60,68 +64,50 @@ impl<'a> GitRemote<'a> {
 
     #[instrument(level = "trace")]
     fn default_branch_symbolic_ref(&self, remote: &str) -> miette::Result<String> {
-        let output = self
-            .0
+        self.0
             .command()
-            .args([
-                "symbolic-ref",
-                "--short",
-                &format!("refs/remotes/{remote}/HEAD"),
-            ])
-            .output_checked_utf8()
-            .into_diagnostic()?
-            .stdout;
-
-        static RE: OnceLock<Regex> = OnceLock::new();
-        let captures = RE
-            .get_or_init(|| {
-                Regex::new(
-                    r"(?xm)
-                    ^
-                    (?P<remote>[[:word:]]+)/(?P<branch>.+)
-                    $
-                    ",
-                )
-                .expect("Regex parses")
+            .args(["symbolic-ref", &format!("refs/remotes/{remote}/HEAD")])
+            .output_checked_as(|context: OutputContext<Utf8Output>| {
+                if !context.status().success() {
+                    Err(context.error())
+                } else {
+                    let output = context.output().stdout.trim_end();
+                    match Ref::from_str(output) {
+                        Err(err) => Err(context.error_msg(err)),
+                        Ok(ref_name) => ref_name
+                            .remote_and_branch()
+                            .map(|(_remote, branch)| branch.to_owned())
+                            .ok_or_else(|| context.error_msg("Ref is not remote branch: {output}")),
+                    }
+                }
             })
-            .captures(&output);
-
-        match captures {
-            Some(captures) => Ok(captures["branch"].to_owned()),
-            None => Err(miette!(
-                "Could not parse `git symbolic-ref` output:\n{output}"
-            )),
-        }
+            .into_diagnostic()
     }
 
     #[instrument(level = "trace")]
     fn default_branch_ls_remote(&self, remote: &str) -> miette::Result<String> {
-        let output = self
+        let branch = self
             .0
             .command()
             .args(["ls-remote", "--symref", remote, "HEAD"])
-            .output_checked_utf8()
-            .into_diagnostic()?
-            .stdout;
-
-        static RE: OnceLock<Regex> = OnceLock::new();
-        let captures = RE
-            .get_or_init(|| {
-                Regex::new(
-                    r"(?xm)
-                    ^
-                    ref:\ refs/heads/(?P<branch>[^\t]+)\tHEAD
-                    $
-                    ",
-                )
-                .expect("Regex parses")
+            .output_checked_as(|context: OutputContext<Utf8Output>| {
+                if !context.status().success() {
+                    Err(context.error())
+                } else {
+                    let output = &context.output().stdout;
+                    match parse_ls_remote_symref.parse(output) {
+                        Err(err) => {
+                            let err = miette!("{err}");
+                            Err(context.error_msg(err))
+                        }
+                        Ok(ref_name) => ref_name
+                            .remote_and_branch()
+                            .map(|(_remote, branch)| branch.to_owned())
+                            .ok_or_else(|| context.error_msg("Ref is not remote branch: {output}")),
+                    }
+                }
             })
-            .captures(&output);
-
-        let branch = match captures {
-            Some(captures) => Ok(captures["branch"].to_owned()),
-            None => Err(miette!("Could not parse `git ls-remote` output:\n{output}")),
-        }?;
+            .into_diagnostic()?;
 
         // To avoid talking to the remote next time, write a symbolic-ref.
         self.0
@@ -203,5 +189,40 @@ impl<'a> GitRemote<'a> {
         } else {
             Ok(None)
         }
+    }
+}
+
+/// Parse a symbolic ref from the start of `git ls-remote --symref` output.
+fn parse_ls_remote_symref(input: &mut &str) -> PResult<Ref> {
+    let _ = "ref: ".parse_next(input)?;
+    let ref_name = take_till(1.., '\t')
+        .and_then(Ref::parser)
+        .parse_next(input)?;
+    let _ = '\t'.parse_next(input)?;
+    // Don't care about the rest!
+    let _ = rest.parse_next(input)?;
+    Ok(ref_name)
+}
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    #[test]
+    fn test_parse_ls_remote_symref() {
+        assert_eq!(
+            parse_ls_remote_symref
+                .parse(indoc!(
+                    "
+                    ref: refs/heads/main\tHEAD
+                    9afc843b4288394fe3a2680b13070cfd53164b92\tHEAD
+                    "
+                ))
+                .unwrap(),
+            Ref::from_str("refs/heads/main").unwrap(),
+        );
     }
 }

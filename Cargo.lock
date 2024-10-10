@@ -337,6 +337,7 @@ dependencies = [
  "utf8-command",
  "walkdir",
  "which",
+ "winnow",
  "xdg",
 ]
 

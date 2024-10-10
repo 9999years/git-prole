@@ -56,6 +56,7 @@ tracing-subscriber = { version = "0.3.18", features = ["env-filter", "registry"]
 utf8-command = "1.0.1"
 walkdir = "2.5.0"
 which = "6.0.3"
+winnow = "0.6.20"
 xdg = "2.5.2"
 
 [dev-dependencies]
