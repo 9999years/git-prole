@@ -65,19 +65,17 @@ impl Config {
 /// Configuration file format.
 #[derive(Debug, Default, Deserialize, PartialEq, Eq)]
 pub struct ConfigFile {
-    /// Remotes to pick a default branch from, in order.
     #[serde(default)]
     remotes: Vec<String>,
 
-    /// Default branches to use, in order.
-    ///
-    /// Only used if no remotes are found.
     #[serde(default)]
     default_branches: Vec<String>,
 
-    /// Copy untracked files when creating new worktrees.
     #[serde(default)]
     copy_untracked: Option<bool>,
+
+    #[serde(default)]
+    enable_gh: Option<bool>,
 }
 
 impl ConfigFile {
@@ -102,6 +100,10 @@ impl ConfigFile {
     pub fn copy_untracked(&self) -> bool {
         self.copy_untracked.unwrap_or(true)
     }
+
+    pub fn enable_gh(&self) -> bool {
+        self.enable_gh.unwrap_or(false)
+    }
 }
 
 #[cfg(test)]
@@ -117,6 +119,7 @@ mod tests {
                 remotes: vec!["upstream".to_owned(), "origin".to_owned(),],
                 default_branches: vec!["main".to_owned(), "master".to_owned(), "trunk".to_owned(),],
                 copy_untracked: Some(true),
+                enable_gh: Some(false),
             }
         );
     }

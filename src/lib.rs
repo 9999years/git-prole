@@ -25,6 +25,7 @@ mod utf8tempdir;
 pub use app::App;
 pub use app_git::AppGit;
 pub use config::Config;
+pub use format_bulleted_list::format_bulleted_list;
 pub use git::Git;
 pub use normal_path::NormalPath;
 pub use utf8tempdir::Utf8TempDir;

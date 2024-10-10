@@ -379,7 +379,7 @@ mod tests {
                     path: "/Users/wiggles/cabal/master".into(),
                     head: CommitHash::from("c53a03ae672c7d2d33ad9aa2469c1e38f3a052ce".to_owned()),
                     branch: Some(Ref::from_str("refs/heads/master").unwrap()),
-                    is_main: false,
+                    is_main: true,
                 },
                 Worktree {
                     path: "/Users/wiggles/lix".into(),

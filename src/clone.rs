@@ -23,7 +23,10 @@ pub fn clone(git: AppGit<'_>, args: CloneArgs) -> miette::Result<()> {
         return Err(miette!("--dry-run is not supported for this command yet"));
     }
 
-    if looks_like_gh_url(&args.repository) && which_global("gh").is_ok() {
+    if git.config.file.enable_gh()
+        && looks_like_gh_url(&args.repository)
+        && which_global("gh").is_ok()
+    {
         Command::new("gh")
             .args(["repo", "clone", &args.repository, destination.as_str()])
             .args(args.clone_args)

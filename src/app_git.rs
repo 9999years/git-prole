@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::ops::Deref;
+use std::ops::DerefMut;
 
 use miette::miette;
 use tracing::instrument;
@@ -31,6 +32,12 @@ impl Deref for AppGit<'_> {
     }
 }
 
+impl DerefMut for AppGit<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.git
+    }
+}
+
 impl AsRef<Git> for AppGit<'_> {
     fn as_ref(&self) -> &Git {
         &self.git
@@ -39,7 +46,7 @@ impl AsRef<Git> for AppGit<'_> {
 
 impl AsRef<Config> for AppGit<'_> {
     fn as_ref(&self) -> &Config {
-        &self.config
+        self.config
     }
 }
 

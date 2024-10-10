@@ -41,3 +41,10 @@ default_branches = [
 # files can take some time, so this setting can be used to disable this
 # behavior if needed.
 copy_untracked = true
+
+# When you run `git prole clone foo/bar`, if `enable_gh = true` and `gh` is
+# installed, I'll run `gh repo clone foo/bar` as a shortcut for GitHub
+# repositories.
+#
+# See: https://cli.github.com/
+enable_gh = false
