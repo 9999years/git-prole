@@ -27,7 +27,7 @@ impl Utf8TempDir {
     }
 
     #[expect(dead_code)]
-    pub fn as_path(&self) -> &Utf8Path {
+    pub(crate) fn as_path(&self) -> &Utf8Path {
         &self.path
     }
 }

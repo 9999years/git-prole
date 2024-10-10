@@ -7,13 +7,14 @@ use serde::Deserialize;
 use xdg::BaseDirectories;
 
 use crate::cli::Cli;
+use crate::install_tracing::install_tracing;
 
 /// Configuration, both from the command-line and a user configuration file.
 #[derive(Debug)]
 pub struct Config {
     /// User directories.
     #[expect(dead_code)]
-    pub dirs: BaseDirectories,
+    pub(crate) dirs: BaseDirectories,
     /// User configuration file.
     pub file: ConfigFile,
     /// User configuration file path.
@@ -28,6 +29,8 @@ impl Config {
 
     pub fn new() -> miette::Result<Self> {
         let cli = Cli::parse();
+        // TODO: add tracing settings to the config file
+        install_tracing(&cli.log)?;
         let dirs = BaseDirectories::with_prefix("git-prole").into_diagnostic()?;
         const CONFIG_FILE_NAME: &str = "config.toml";
         // TODO: Use `git config` for configuration?

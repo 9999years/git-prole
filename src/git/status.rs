@@ -28,7 +28,7 @@ impl<'a> GitStatus<'a> {
     }
 
     #[expect(dead_code)] // #[instrument(level = "trace")]
-    pub fn get(&self) -> miette::Result<Status> {
+    pub(crate) fn get(&self) -> miette::Result<Status> {
         self.0
             .command()
             .args(["status", "--porcelain=v1", "--ignored=traditional", "-z"])
@@ -176,7 +176,7 @@ pub struct Status {
 
 impl Status {
     #[expect(dead_code)]
-    pub fn is_clean(&self) -> bool {
+    pub(crate) fn is_clean(&self) -> bool {
         self.entries.iter().all(|entry| !entry.is_modified())
     }
 }

@@ -40,7 +40,7 @@ impl Ref {
 
     /// Determine if this is a tag, i.e. its kind is [`Self::TAGS`].
     #[expect(dead_code)]
-    pub fn is_tag(&self) -> bool {
+    pub(crate) fn is_tag(&self) -> bool {
         self.kind == Self::TAGS
     }
 

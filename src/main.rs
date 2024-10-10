@@ -1,25 +1,7 @@
-use config::Config;
-use install_tracing::install_tracing;
-
-mod add;
-mod app;
-mod app_git;
-mod cli;
-mod clone;
-mod config;
-mod convert;
-mod copy_dir;
-mod current_dir;
-mod format_bulleted_list;
-mod gh;
-mod git;
-mod install_tracing;
-mod normal_path;
-mod topological_sort;
-mod utf8tempdir;
+use git_prole::App;
+use git_prole::Config;
 
 fn main() -> miette::Result<()> {
     let config = Config::new()?;
-    install_tracing(&config.cli.log)?;
-    app::App::new(config).run()
+    App::new(config).run()
 }

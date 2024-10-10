@@ -40,7 +40,7 @@ impl<'a> GitPath<'a> {
 
     /// Get the `.git` directory path.
     #[expect(dead_code)] // #[instrument(level = "trace")]
-    pub fn get_git_dir(&self) -> miette::Result<Utf8PathBuf> {
+    pub(crate) fn get_git_dir(&self) -> miette::Result<Utf8PathBuf> {
         self.0
             .rev_parse_command()
             .arg("--git-dir")

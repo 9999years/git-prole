@@ -45,7 +45,7 @@ impl<'a> GitRemote<'a> {
 
     /// Get the (push) URL for the given remote.
     #[expect(dead_code)] // #[instrument(level = "trace")]
-    pub fn get_push_url(&self, remote: &str) -> miette::Result<String> {
+    pub(crate) fn get_push_url(&self, remote: &str) -> miette::Result<String> {
         Ok(self
             .0
             .command()

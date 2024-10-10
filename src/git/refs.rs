@@ -31,7 +31,7 @@ impl<'a> GitRefs<'a> {
     }
 
     #[expect(dead_code)] // #[instrument(level = "trace")]
-    pub fn commit_message(&self, commit: &str) -> miette::Result<String> {
+    pub(crate) fn commit_message(&self, commit: &str) -> miette::Result<String> {
         Ok(self
             .0
             .command()
@@ -97,7 +97,7 @@ impl<'a> GitRefs<'a> {
 
     /// Determine if a given `<commit-ish>` refers to a commit or a symbolic ref name.
     #[expect(dead_code)] // #[instrument(level = "trace")]
-    pub fn resolve_commitish(&self, commitish: &str) -> miette::Result<ResolvedCommitish> {
+    pub(crate) fn resolve_commitish(&self, commitish: &str) -> miette::Result<ResolvedCommitish> {
         match self.rev_parse_symbolic_full_name(commitish)? {
             Some(ref_name) => Ok(ResolvedCommitish::Ref(ref_name)),
             None => Ok(ResolvedCommitish::Commit(
