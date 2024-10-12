@@ -35,13 +35,15 @@ impl Display for ConvertPlan<'_> {
 impl<'a> ConvertPlan<'a> {
     pub fn new(git: AppGit<'a>, opts: ConvertPlanOpts) -> miette::Result<Self> {
         // Figuring out which worktrees to create is non-trivial:
-        // - We might already have worktrees.
-        // - We might have any number of remotes.
+        // - [x] We might already have worktrees.
+        // - [x] We might have any number of remotes.
         //   Pick a reasonable & configurable default to determine the default branch.
-        // - We might already have the default branch checked out.
-        // - We might _not_ have the default branch checked out.
-        // - We might have unstaged/uncommitted work.
-        // - We might not be on _any_ branch.
+        // - [x] We might already have the default branch checked out.
+        // - [x] We might _not_ have the default branch checked out.
+        // - [x] We might have unstaged/uncommitted work.
+        //       TODO: The `git reset` causes staged changes to be lost; bring back the
+        //       `git status push`/`pop`?
+        // - [x] We might not be on _any_ branch.
 
         let tempdir = NormalPath::from_cwd(Utf8TempDir::new()?.into_path())?;
         let worktrees = git.worktree().list()?;

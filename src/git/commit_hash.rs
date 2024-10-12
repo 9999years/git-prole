@@ -10,7 +10,7 @@ use winnow::Parser;
 
 /// A Git commit hash.
 #[derive(
-    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Into, From, AsRef, Deref, DerefMut, Constructor,
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Into, AsRef, Deref, DerefMut, Constructor,
 )]
 pub struct CommitHash(String);
 
@@ -40,9 +40,12 @@ impl Display for CommitHash {
     }
 }
 
-impl From<&str> for CommitHash {
-    fn from(value: &str) -> Self {
-        Self(value.into())
+impl<S> From<S> for CommitHash
+where
+    S: AsRef<str>,
+{
+    fn from(value: S) -> Self {
+        Self(value.as_ref().into())
     }
 }
 

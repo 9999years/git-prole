@@ -6,6 +6,7 @@ use command_error::OutputContext;
 use miette::miette;
 use miette::Context;
 use miette::IntoDiagnostic;
+use tap::Tap;
 use tracing::instrument;
 use utf8_command::Utf8Output;
 
@@ -151,5 +152,21 @@ impl<'a> GitRefs<'a> {
                 .expect("Non-detached HEAD should always be a local branch"),
             )
         })
+    }
+
+    #[instrument(level = "trace")]
+    pub fn for_each_ref(&self, glob: Option<&str>) -> miette::Result<Vec<Ref>> {
+        self.0
+            .command()
+            .args(["for-each-ref", "--format=%(refname)"])
+            .tap_mut(|c| {
+                glob.map(|glob| c.arg(glob));
+            })
+            .output_checked_utf8()
+            .into_diagnostic()?
+            .stdout
+            .lines()
+            .map(Ref::from_str)
+            .collect()
     }
 }

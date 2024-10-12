@@ -35,8 +35,8 @@ impl<'a> GitStatus<'a> {
         Self(git)
     }
 
-    #[expect(dead_code)] // #[instrument(level = "trace")]
-    pub(crate) fn get(&self) -> miette::Result<Status> {
+    #[instrument(level = "trace")]
+    pub fn get(&self) -> miette::Result<Status> {
         self.0
             .command()
             .args(["status", "--porcelain=v1", "--ignored=traditional", "-z"])
@@ -124,12 +124,16 @@ impl StatusCode {
 /// The status of a particular file.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StatusEntry {
+    /// The status of the file in the index.
+    ///
     /// If no merge is occurring, or a merge was successful, this indicates the status of the
     /// index.
     ///
     /// If a merge conflict has occured and is not resolved, this is the left head of th
     /// merge.
     left: StatusCode,
+    /// The status of the file in the working tree.
+    ///
     /// If no merge is occurring, or a merge was successful, this indicates the status of the
     /// working tree.
     ///
@@ -181,6 +185,14 @@ impl StatusEntry {
     }
 }
 
+impl FromStr for StatusEntry {
+    type Err = miette::Report;
+
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        Self::parser.parse(input).map_err(|err| miette!("{err}"))
+    }
+}
+
 /// A `git status` listing.
 ///
 /// ```plain
@@ -198,14 +210,14 @@ impl StatusEntry {
 /// ?? src/utf8tempdir.rs
 /// !! target/
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Status {
-    entries: Vec<StatusEntry>,
+    pub entries: Vec<StatusEntry>,
 }
 
 impl Status {
-    #[expect(dead_code)]
-    pub(crate) fn is_clean(&self) -> bool {
+    #[instrument(level = "trace")]
+    pub fn is_clean(&self) -> bool {
         self.entries.iter().all(|entry| !entry.is_modified())
     }
 

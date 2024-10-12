@@ -52,6 +52,8 @@ impl GitProle {
                 // > Whether to skip reading settings from the system-wide $(prefix)/etc/gitconfig file.
                 ("GIT_CONFIG_NOSYSTEM", "1"),
                 ("GIT_CONFIG_GLOBAL", gitconfig.as_str()),
+                ("GIT_AUTHOR_DATE", "2019-07-06T18:25:00"),
+                ("GIT_COMMITTER_DATE", "2019-07-06T18:25:00"),
                 ("HOME", tempdir.as_str()),
             ])
             .current_dir(&tempdir);

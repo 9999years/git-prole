@@ -6,7 +6,7 @@ use super::CommitHash;
 use super::LocalBranchRef;
 
 /// Is `HEAD` detached?
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HeadKind {
     Detached(CommitHash),
     Branch(LocalBranchRef),

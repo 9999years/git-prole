@@ -151,36 +151,31 @@ impl<'a> GitRemote<'a> {
     /// This is (hopefully!) how Git determines which remote-tracking branch you want when you do a
     /// `git switch` or `git worktree add`.
     #[instrument(level = "trace")]
-    pub fn for_branch(&self, branch: &str) -> miette::Result<Option<String>> {
-        let refs = self
+    pub fn for_branch(&self, branch: &str) -> miette::Result<Option<RemoteBranchRef>> {
+        let mut exists_on_remotes = self
             .0
-            .command()
-            .args([
-                "for-each-ref",
-                "--format=%(refname)",
-                &format!("refs/remotes/*/{branch}"),
-            ])
-            .output_checked_utf8()
-            .into_diagnostic()?
-            .stdout;
-
-        let mut exists_on_remotes = Vec::new();
-
-        for ref_name in refs.lines() {
-            let parsed_ref = RemoteBranchRef::try_from(Ref::from_str(ref_name)?)?;
-            exists_on_remotes.push(parsed_ref.remote().to_owned());
-        }
+            .refs()
+            .for_each_ref(Some(&format!("refs/remotes/*/{branch}")))?;
 
         if exists_on_remotes.is_empty() {
             Ok(None)
         } else if exists_on_remotes.len() == 1 {
-            Ok(exists_on_remotes.pop())
+            Ok(exists_on_remotes.pop().map(|ref_name| {
+                RemoteBranchRef::try_from(ref_name)
+                    .expect("`for-each-ref` restricted to `refs/remotes/*` refs")
+            }))
         } else if let Some(default_remote) = self.get_default()? {
             // if-let chains when?
-            if exists_on_remotes.contains(&default_remote) {
-                Ok(Some(default_remote))
-            } else {
-                Ok(None)
+            match exists_on_remotes
+                .into_iter()
+                .map(|ref_name| {
+                    RemoteBranchRef::try_from(ref_name)
+                        .expect("`for-each-ref` restricted to `refs/remotes/*` refs")
+                })
+                .find(|branch| branch.remote() == &default_remote)
+            {
+                Some(remote) => Ok(Some(remote)),
+                _ => Ok(None),
             }
         } else {
             Ok(None)

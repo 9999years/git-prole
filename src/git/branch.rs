@@ -1,6 +1,5 @@
 use std::collections::HashSet;
 use std::fmt::Debug;
-use std::str::FromStr;
 
 use command_error::CommandExt;
 use command_error::OutputContext;
@@ -11,8 +10,6 @@ use utf8_command::Utf8Output;
 use super::BranchRef;
 use super::Git;
 use super::LocalBranchRef;
-use super::Ref;
-use super::RemoteBranchRef;
 
 /// Git methods for dealing with worktrees.
 #[repr(transparent)]
@@ -33,25 +30,11 @@ impl<'a> GitBranch<'a> {
     #[instrument(level = "trace")]
     pub fn list_local(&self) -> miette::Result<HashSet<LocalBranchRef>> {
         self.0
-            .command()
-            .args(["branch", "--format=%(refname)"])
-            .output_checked_as(|context: OutputContext<Utf8Output>| {
-                if !context.status().success() {
-                    Err(context.error())
-                } else {
-                    match context
-                        .output()
-                        .stdout
-                        .lines()
-                        .map(|line| Ref::from_str(line).and_then(LocalBranchRef::try_from))
-                        .collect::<Result<HashSet<_>, _>>()
-                    {
-                        Ok(branches) => Ok(branches),
-                        Err(err) => Err(context.error_msg(err)),
-                    }
-                }
-            })
-            .into_diagnostic()
+            .refs()
+            .for_each_ref(Some("refs/heads/**"))?
+            .into_iter()
+            .map(LocalBranchRef::try_from)
+            .collect::<Result<HashSet<_>, _>>()
     }
 
     /// Does a local branch exist?
@@ -72,7 +55,7 @@ impl<'a> GitBranch<'a> {
             Ok(Some(LocalBranchRef::new(branch.to_owned()).into()))
         } else if let Some(remote) = self.0.remote().for_branch(branch)? {
             // This is the implicit behavior documented in `git-worktree(1)`.
-            Ok(Some(RemoteBranchRef::new(&remote, branch).into()))
+            Ok(Some(remote.into()))
         } else {
             Ok(None)
         }
