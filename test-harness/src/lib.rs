@@ -14,6 +14,10 @@ use miette::miette;
 use miette::Context;
 use miette::IntoDiagnostic;
 
+mod helpers;
+
+pub use helpers::*;
+
 /// `git-prole` session for integration testing.
 pub struct GitProle {
     command: ClonableCommand,
@@ -209,6 +213,14 @@ impl GitProle {
             .into_diagnostic()
             .wrap_err_with(|| format!("Failed to convert {path} to a worktree checkout"))?;
 
+        Ok(())
+    }
+
+    pub fn write_config(&self, contents: &str) -> miette::Result<()> {
+        fs::create_dir_all(self.path(".config/git-prole")).into_diagnostic()?;
+        fs::write(self.path(".config/git-prole/config.toml"), contents)
+            .into_diagnostic()
+            .wrap_err("Failed to write `git-prole` configuration")?;
         Ok(())
     }
 }
