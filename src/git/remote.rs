@@ -155,7 +155,7 @@ impl<'a> GitRemote<'a> {
         let mut exists_on_remotes = self
             .0
             .refs()
-            .for_each_ref(Some(&format!("refs/remotes/*/{branch}")))?;
+            .for_each_ref(Some(&[&format!("refs/remotes/*/{branch}")]))?;
 
         if exists_on_remotes.is_empty() {
             Ok(None)

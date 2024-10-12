@@ -155,12 +155,12 @@ impl<'a> GitRefs<'a> {
     }
 
     #[instrument(level = "trace")]
-    pub fn for_each_ref(&self, glob: Option<&str>) -> miette::Result<Vec<Ref>> {
+    pub fn for_each_ref(&self, globs: Option<&[&str]>) -> miette::Result<Vec<Ref>> {
         self.0
             .command()
             .args(["for-each-ref", "--format=%(refname)"])
             .tap_mut(|c| {
-                glob.map(|glob| c.arg(glob));
+                globs.map(|globs| c.args(globs));
             })
             .output_checked_utf8()
             .into_diagnostic()?

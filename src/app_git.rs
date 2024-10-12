@@ -112,6 +112,10 @@ impl<'a> AppGit<'a> {
             let preferred_branch = LocalBranchRef::new(preferred_branch);
             if all_branches.contains(&preferred_branch) {
                 return Ok(preferred_branch.into());
+            } else if let Some(remote_branch) =
+                self.remote().for_branch(preferred_branch.branch_name())?
+            {
+                return Ok(remote_branch.into());
             }
         }
 

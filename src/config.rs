@@ -63,6 +63,10 @@ impl Config {
 }
 
 /// Configuration file format.
+///
+/// Each configuration key should have two test cases:
+/// - `config_{key}` for setting the value.
+/// - `config_{key}_default` for the default value.
 #[derive(Debug, Default, Deserialize, PartialEq, Eq)]
 pub struct ConfigFile {
     #[serde(default)]

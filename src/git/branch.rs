@@ -31,9 +31,20 @@ impl<'a> GitBranch<'a> {
     pub fn list_local(&self) -> miette::Result<HashSet<LocalBranchRef>> {
         self.0
             .refs()
-            .for_each_ref(Some("refs/heads/**"))?
+            .for_each_ref(Some(&["refs/heads/**"]))?
             .into_iter()
             .map(LocalBranchRef::try_from)
+            .collect::<Result<HashSet<_>, _>>()
+    }
+
+    /// Lists local and remote branches.
+    #[instrument(level = "trace")]
+    pub fn list(&self) -> miette::Result<HashSet<BranchRef>> {
+        self.0
+            .refs()
+            .for_each_ref(Some(&["refs/heads/**", "refs/remotes/**"]))?
+            .into_iter()
+            .map(BranchRef::try_from)
             .collect::<Result<HashSet<_>, _>>()
     }
 
