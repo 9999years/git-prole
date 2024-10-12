@@ -172,7 +172,7 @@ impl<'a> GitRemote<'a> {
                     RemoteBranchRef::try_from(ref_name)
                         .expect("`for-each-ref` restricted to `refs/remotes/*` refs")
                 })
-                .find(|branch| branch.remote() == &default_remote)
+                .find(|branch| branch.remote() == default_remote)
             {
                 Some(remote) => Ok(Some(remote)),
                 _ => Ok(None),
