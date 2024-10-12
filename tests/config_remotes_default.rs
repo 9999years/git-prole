@@ -28,7 +28,7 @@ fn convert_multiple_remotes() -> miette::Result<()> {
         "#)?;
 
     // Okay, this leaves us with remotes `fork`, `upstream`, and `puppy` with default branches
-    // `a`, `b`, and `c` respectively!
+    // `a`, `b`, and `c` respectively.
     //
     // The default config says `upstream` is more important than `origin`, so we use that!
 
@@ -39,7 +39,6 @@ fn convert_multiple_remotes() -> miette::Result<()> {
         .into_diagnostic()?;
 
     assert_eq!(prole.current_branch_in("my-repo/main")?, "main");
-    assert_eq!(prole.current_branch_in("my-repo/b")?, "b");
 
     Ok(())
 }

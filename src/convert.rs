@@ -13,6 +13,7 @@ use crate::git::BranchRef;
 use crate::git::LocalBranchRef;
 use crate::normal_path::NormalPath;
 use crate::utf8tempdir::Utf8TempDir;
+use crate::AddWorktreeOpts;
 
 #[derive(Debug)]
 pub struct ConvertPlanOpts {
@@ -44,6 +45,8 @@ impl<'a> ConvertPlan<'a> {
         //       TODO: The `git reset` causes staged changes to be lost; bring back the
         //       `git status push`/`pop`?
         // - [x] We might not be on _any_ branch.
+        // - [x] There is no local branch for the default branch.
+        //       (`convert_multiple_remotes`)
 
         let tempdir = NormalPath::from_cwd(Utf8TempDir::new()?.into_path())?;
         let worktrees = git.worktree().list()?;
@@ -144,7 +147,7 @@ impl<'a> ConvertPlan<'a> {
             steps.push(Step::CreateWorktree {
                 repo: repo_git_dir.clone(),
                 path: default_branch_root.clone(),
-                commitish: default_branch,
+                branch: default_branch,
             });
         }
 
@@ -182,16 +185,6 @@ impl<'a> ConvertPlan<'a> {
                 Step::CreateDir { path } => {
                     fs::create_dir_all(path).into_diagnostic()?;
                 }
-                Step::CreateWorktree {
-                    repo: repo_root,
-                    path,
-                    commitish,
-                } => {
-                    self.git
-                        .with_directory(repo_root.as_path().to_owned())
-                        .worktree()
-                        .add(path.as_path(), commitish.qualified_branch_name())?;
-                }
                 Step::Move { from, to } => {
                     fs::rename(from, to).into_diagnostic()?;
                 }
@@ -201,6 +194,54 @@ impl<'a> ConvertPlan<'a> {
                         .config()
                         .set(key, value)?;
                 }
+                Step::CreateWorktree {
+                    repo: repo_root,
+                    path,
+                    branch,
+                } => {
+                    // If we're creating a worktree for a default branch from a
+                    // remote, we may not have a corresponding local branch
+                    // yet.
+                    let (create_branch, start_point) = match branch {
+                        BranchRef::Remote(remote_branch) => {
+                            if self
+                                .git
+                                .branch()
+                                .exists_local(remote_branch.branch_name())?
+                            {
+                                (None, &BranchRef::Local(remote_branch.as_local()))
+                            } else {
+                                tracing::warn!(
+                                    %remote_branch,
+                                    "Fetching the default branch"
+                                );
+                                self.git.remote().fetch(
+                                    remote_branch.remote(),
+                                    Some(&format!(
+                                        "{:#}:{remote_branch:#}",
+                                        remote_branch.as_local()
+                                    )),
+                                )?;
+                                (Some(remote_branch.as_local()), branch)
+                            }
+                        }
+                        BranchRef::Local(_) => (None, branch),
+                    };
+
+                    self.git
+                        .with_directory(repo_root.as_path().to_owned())
+                        .worktree()
+                        // .add(path.as_path(), commitish.qualified_branch_name())?;
+                        .add(
+                            path.as_path(),
+                            &AddWorktreeOpts {
+                                track: create_branch.is_some(),
+                                create_branch: create_branch.as_ref(),
+                                start_point: Some(start_point.qualified_branch_name()),
+                                ..Default::default()
+                            },
+                        )?;
+                }
                 Step::CreateWorktreeNoCheckout {
                     repo,
                     path,
@@ -209,7 +250,14 @@ impl<'a> ConvertPlan<'a> {
                     self.git
                         .with_directory(repo.as_path().to_owned())
                         .worktree()
-                        .add_no_checkout(path, commitish)?;
+                        .add(
+                            path,
+                            &AddWorktreeOpts {
+                                checkout: false,
+                                start_point: Some(commitish),
+                                ..Default::default()
+                            },
+                        )?;
                 }
                 Step::Reset { repo } => {
                     self.git.with_directory(repo.as_path().to_owned()).reset()?;
@@ -265,7 +313,7 @@ pub enum Step {
     CreateWorktree {
         repo: NormalPath,
         path: NormalPath,
-        commitish: BranchRef,
+        branch: BranchRef,
     },
 }
 
@@ -284,7 +332,7 @@ impl Display for Step {
             }
             Step::CreateWorktree {
                 path,
-                commitish,
+                branch: commitish,
                 repo: repo_root,
             } => {
                 write!(

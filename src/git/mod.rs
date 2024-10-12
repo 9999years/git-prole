@@ -36,6 +36,7 @@ pub use status::GitStatus;
 pub use status::Status;
 pub use status::StatusCode;
 pub use status::StatusEntry;
+pub use worktree::AddWorktreeOpts;
 pub use worktree::GitWorktree;
 pub use worktree::Worktree;
 pub use worktree::WorktreeHead;

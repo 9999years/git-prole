@@ -25,7 +25,15 @@ impl PartialEq<Ref> for RemoteBranchRef {
 
 impl RemoteBranchRef {
     pub fn new(remote: &str, name: &str) -> Self {
-        Self(Ref::new(Ref::HEADS.to_owned(), format!("{remote}/{name}")))
+        Self(Ref::new(
+            Ref::REMOTES.to_owned(),
+            format!("{remote}/{name}"),
+        ))
+    }
+
+    /// Get the qualified name of this branch, including the remote name.
+    pub fn qualified_branch_name(&self) -> &str {
+        self.name()
     }
 
     /// Get the name of this remote and branch.
@@ -93,5 +101,52 @@ mod tests {
 
         assert_eq!(branch.remote(), "puppy");
         assert_eq!(branch.branch_name(), "doggy");
+    }
+
+    #[test]
+    fn test_remote_branch_new() {
+        assert_eq!(
+            RemoteBranchRef::new("origin", "puppy"),
+            Ref::from_str("refs/remotes/origin/puppy").unwrap(),
+        );
+    }
+
+    #[test]
+    fn test_remote_branch_qualified_branch_name() {
+        assert_eq!(
+            RemoteBranchRef::new("origin", "puppy").qualified_branch_name(),
+            "origin/puppy",
+        );
+    }
+
+    #[test]
+    fn test_remote_branch_remote_and_branch() {
+        assert_eq!(
+            RemoteBranchRef::new("origin", "puppy/doggy").remote_and_branch(),
+            ("origin", "puppy/doggy"),
+        );
+    }
+
+    #[test]
+    fn test_remote_branch_branch_name() {
+        assert_eq!(
+            RemoteBranchRef::new("origin", "puppy").branch_name(),
+            "puppy",
+        );
+    }
+
+    #[test]
+    fn test_remote_branch_as_local() {
+        assert_eq!(
+            RemoteBranchRef::new("origin", "puppy").as_local(),
+            Ref::from_str("refs/heads/puppy").unwrap(),
+        );
+    }
+
+    #[test]
+    fn test_remote_branch_display() {
+        let branch = RemoteBranchRef::new("origin", "puppy");
+        assert_eq!(format!("{branch}"), "origin/puppy");
+        assert_eq!(format!("{branch:#}"), "refs/remotes/origin/puppy");
     }
 }

@@ -88,4 +88,39 @@ mod tests {
 
         assert_eq!(branch.branch_name(), "puppy/doggy");
     }
+
+    #[test]
+    fn local_branch_ref_from_str() {
+        let branch = LocalBranchRef::from("puppy");
+
+        assert_eq!(branch, Ref::from_str("refs/heads/puppy").unwrap());
+    }
+
+    #[test]
+    fn test_local_branch_new() {
+        assert_eq!(
+            LocalBranchRef::new("puppy".into()),
+            Ref::from_str("refs/heads/puppy").unwrap(),
+        );
+    }
+
+    #[test]
+    fn test_local_branch_branch_name() {
+        assert_eq!(LocalBranchRef::new("puppy".into()).branch_name(), "puppy",);
+    }
+
+    #[test]
+    fn test_local_branch_on_remote() {
+        assert_eq!(
+            LocalBranchRef::new("puppy".into()).on_remote("origin"),
+            Ref::from_str("refs/remotes/origin/puppy").unwrap(),
+        );
+    }
+
+    #[test]
+    fn test_remote_branch_display() {
+        let branch = LocalBranchRef::new("puppy".into());
+        assert_eq!(format!("{branch}"), "puppy");
+        assert_eq!(format!("{branch:#}"), "refs/heads/puppy");
+    }
 }

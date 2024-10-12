@@ -181,6 +181,18 @@ impl<'a> GitRemote<'a> {
             Ok(None)
         }
     }
+
+    /// Fetch a refspec from a remote.
+    #[instrument(level = "trace")]
+    pub fn fetch(&self, remote: &str, refspec: Option<&str>) -> miette::Result<()> {
+        let mut command = self.0.command();
+        command.args(["fetch", remote]);
+        if let Some(refspec) = refspec {
+            command.arg(refspec);
+        }
+        command.status_checked().into_diagnostic()?;
+        Ok(())
+    }
 }
 
 /// Parse a symbolic ref from the start of `git ls-remote --symref` output.

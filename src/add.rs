@@ -18,6 +18,7 @@ use crate::git::BranchRef;
 use crate::git::Git;
 use crate::git::LocalBranchRef;
 use crate::normal_path::NormalPath;
+use crate::AddWorktreeOpts;
 
 /// A plan for creating a new `git worktree`.
 #[derive(Debug, Clone)]
@@ -78,50 +79,37 @@ impl<'a> WorktreePlan<'a> {
     }
 
     fn command(&self, git: &Git) -> Command {
-        let mut command = git.with_directory(self.worktree.clone()).command();
-        command.args(["worktree", "add"]);
-
-        match &self.branch {
-            BranchStartPointPlan::Existing(_) => {}
+        let (force_branch, track, create_branch) = match &self.branch {
+            BranchStartPointPlan::Existing(_) => (false, false, None),
             BranchStartPointPlan::New {
                 force,
                 branch,
                 start,
             } => {
-                match start {
-                    StartPoint::Branch(_) => {
-                        command.arg("--track");
-                    }
-                    StartPoint::Commitish(_) => {}
-                }
+                let track = matches!(start, StartPoint::Branch(_));
 
-                if *force {
-                    command.arg("-B");
-                } else {
-                    command.arg("-b");
-                }
-
-                command.arg(branch.branch_name());
+                (*force, track, Some(branch))
             }
-        }
+        };
 
-        command.arg(self.destination.as_str());
-
-        match &self.branch {
-            BranchStartPointPlan::Existing(branch) => {
-                command.arg(branch.branch_name());
-            }
-            BranchStartPointPlan::New { start, .. } => match start {
-                StartPoint::Branch(start) => {
-                    command.arg(start.qualified_branch_name());
-                }
-                StartPoint::Commitish(commitish) => {
-                    command.arg(commitish);
-                }
-            },
-        }
-
-        command
+        git.with_directory(self.worktree.clone())
+            .worktree()
+            .add_command(
+                &self.destination,
+                &AddWorktreeOpts {
+                    force_branch,
+                    create_branch,
+                    track,
+                    start_point: Some(match &self.branch {
+                        BranchStartPointPlan::Existing(branch) => branch.branch_name(),
+                        BranchStartPointPlan::New { start, .. } => match start {
+                            StartPoint::Branch(start) => start.qualified_branch_name(),
+                            StartPoint::Commitish(commitish) => commitish,
+                        },
+                    }),
+                    ..Default::default()
+                },
+            )
     }
 
     fn copy_untracked(&self) -> miette::Result<()> {

@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Display;
 use std::ops::Deref;
+use std::process::Command;
 use std::str::FromStr;
 
 use camino::Utf8Path;
@@ -28,6 +29,7 @@ use crate::NormalPath;
 
 use super::commit_hash::CommitHash;
 use super::Git;
+use super::LocalBranchRef;
 use super::Ref;
 
 /// Git methods for dealing with worktrees.
@@ -106,23 +108,42 @@ impl<'a> GitWorktree<'a> {
     }
 
     #[instrument(level = "trace")]
-    pub fn add(&self, path: &Utf8Path, commitish: &str) -> miette::Result<()> {
-        self.0
-            .command()
-            .args(["worktree", "add", path.as_str(), commitish])
+    pub fn add(&self, path: &Utf8Path, options: &AddWorktreeOpts<'_>) -> miette::Result<()> {
+        self.add_command(path, options)
             .status_checked()
             .into_diagnostic()?;
         Ok(())
     }
 
     #[instrument(level = "trace")]
-    pub fn add_no_checkout(&self, path: &Utf8Path, commitish: &str) -> miette::Result<()> {
-        self.0
-            .command()
-            .args(["worktree", "add", "--no-checkout", path.as_str(), commitish])
-            .status_checked()
-            .into_diagnostic()?;
-        Ok(())
+    pub fn add_command(&self, path: &Utf8Path, options: &AddWorktreeOpts<'_>) -> Command {
+        let mut command = self.0.command();
+        command.args(["worktree", "add"]);
+
+        if let Some(branch) = options.create_branch {
+            command.arg(if options.force_branch { "-B" } else { "-b" });
+            command.arg(branch.branch_name());
+        }
+
+        if !options.checkout {
+            command.arg("--no-checkout");
+        }
+
+        if options.guess_remote {
+            command.arg("--guess-remote");
+        }
+
+        if options.track {
+            command.arg("--track");
+        }
+
+        command.arg(path.as_str());
+
+        if let Some(start_point) = options.start_point {
+            command.arg(start_point);
+        }
+
+        command
     }
 
     #[instrument(level = "trace")]
@@ -175,6 +196,40 @@ impl<'a> GitWorktree<'a> {
         Ok(self
             .container()?
             .tap_mut(|p| p.push(self.dirname_for(branch))))
+    }
+}
+
+/// Options for `git worktree add`.
+#[derive(Clone, Copy, Debug)]
+pub struct AddWorktreeOpts<'a> {
+    /// If true, use `-B` instead of `-b` for `create_branch`.
+    /// Default false.
+    pub force_branch: bool,
+    /// Create a new branch.
+    pub create_branch: Option<&'a LocalBranchRef>,
+    /// If false, use `--no-checkout`.
+    /// Default true.
+    pub checkout: bool,
+    /// If true, use `--guess-remote`.
+    /// Default false.
+    pub guess_remote: bool,
+    /// If true, use `--track`.
+    /// Default false.
+    pub track: bool,
+    /// The start point for the new worktree.
+    pub start_point: Option<&'a str>,
+}
+
+impl<'a> Default for AddWorktreeOpts<'a> {
+    fn default() -> Self {
+        Self {
+            force_branch: false,
+            create_branch: None,
+            checkout: true,
+            guess_remote: false,
+            track: false,
+            start_point: None,
+        }
     }
 }
 

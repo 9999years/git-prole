@@ -107,4 +107,30 @@ mod tests {
 
         assert!(BranchRef::try_from(Ref::from_str("refs/tags/v1.0.0").unwrap()).is_err());
     }
+
+    #[test]
+    fn test_branch_qualified_branch_name() {
+        assert_eq!(
+            BranchRef::Remote(RemoteBranchRef::new("origin", "puppy")).qualified_branch_name(),
+            "origin/puppy",
+        );
+
+        assert_eq!(
+            BranchRef::Local(LocalBranchRef::new("puppy".into())).qualified_branch_name(),
+            "puppy",
+        );
+    }
+
+    #[test]
+    fn test_branch_branch_name() {
+        assert_eq!(
+            BranchRef::Remote(RemoteBranchRef::new("origin", "puppy")).branch_name(),
+            "puppy",
+        );
+
+        assert_eq!(
+            BranchRef::Local(LocalBranchRef::new("puppy".into())).branch_name(),
+            "puppy",
+        );
+    }
 }
