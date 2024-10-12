@@ -1,0 +1,50 @@
+# Configuration for `git-prole(1)`, a `git-worktree(1)` manager.
+# See: https://github.com/9999years/git-prole
+# All settings are listed here with their default values.
+
+# When determining a default remote or branch for a repository, the following
+# remotes will be tried, in order:
+#
+# 1. Git's `checkout.defaultRemote` setting.
+# 2. Any remotes listed here.
+#
+# This is used to pick a default branch; see `default_branches`.
+remotes = [
+    "upstream",
+    "origin",
+]
+
+# When determining a default branch for a repository, the following branches
+# will be tried in order:
+#
+# 1. The default branch of the default remote (see `remotes`), as determined by
+#    `git ls-remote --symref "$REMOTE" HEAD`.
+# 2. Any branches listed here.
+#
+# When `git prole convert` is used to convert a repository to a worktree
+# checkout, the main worktree will be checked out to the default branch.
+#
+# When `git prole add` is used to create a new worktree, if a new branch is
+# created, the branch will be set to the default branch unless another starting
+# point is given explicitly.
+default_branches = [
+    "main",
+    "master",
+    "trunk",
+]
+
+# When `git prole add` is used to create a new worktree, untracked files are
+# copied to the new worktree from the current worktree by default.
+#
+# This will allow you to get started quickly by copying build products and
+# other configuration files over to the new worktree. However, copying these
+# files can take some time, so this setting can be used to disable this
+# behavior if needed.
+copy_untracked = true
+
+# When you run `git prole clone foo/bar`, if `enable_gh = true` and `gh` is
+# installed, I'll run `gh repo clone foo/bar` as a shortcut for GitHub
+# repositories.
+#
+# See: https://cli.github.com/
+enable_gh = false

@@ -1,0 +1,27 @@
+[package]
+name = "test-harness"
+version = "0.1.0"
+edition = "2021"
+description = "Test harness for git-prole"
+publish = false
+
+[dependencies]
+camino = "1.1.9"
+clonable-command = "0.2.0"
+command-error = "0.4.1"
+itertools = "0.13.0"
+miette = { version = "*", default-features = false, features = ["fancy-no-backtrace"] }
+regex = "*"
+tempfile = "3.13.0"
+test_bin = "*"
+tracing = "*"
+utf8-command = "1.0.1"
+git-prole = { path = "../" }
+fs-err = "2.11.0"
+shell-words = "1.1.0"
+pretty_assertions = "1.4.1"
+expect-test = "1.5.0"
+
+# See: https://github.com/crate-ci/cargo-release/blob/master/docs/reference.md
+[package.metadata.release]
+release = false
