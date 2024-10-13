@@ -58,12 +58,7 @@ let
         NEXTEST_HIDE_PROGRESS_BAR = "true";
       }
     );
-    git-prole-doctest = craneLib.cargoTest (
-      commonArgs
-      // {
-        cargoTestExtraArgs = "--doc";
-      }
-    );
+    git-prole-doctest = craneLib.cargoDocTest commonArgs;
     git-prole-clippy = craneLib.cargoClippy (
       commonArgs
       // {
