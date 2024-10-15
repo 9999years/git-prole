@@ -31,16 +31,32 @@ pub struct Cli {
 #[allow(rustdoc::bare_urls)]
 #[derive(Debug, Clone, Subcommand)]
 pub enum Command {
-    /// Convert a checkout into a worktree checkout.
+    /// Convert a repository into a worktree checkout.
+    ///
+    /// This will convert the repository in the current directory into a worktree repository. This includes:
+    ///
+    /// - Making the repository a bare repository.
+    ///
+    /// - Converting the current checkout (branch, commit, whatever) into a worktree.
+    ///   Uncommited changes will be kept, but will not remain unstaged.
+    ///
+    /// - Creating a new worktree for the default branch.
     Convert(ConvertArgs),
 
     /// Clone a repository into a worktree checkout.
     ///
     /// If you have `gh` installed and the URL looks `gh`-like and isn't an existing local path,
     /// I'll pass the repository URL to that.
+    ///
+    /// This is just a regular `git clone` followed by `git prole convert`.
     Clone(CloneArgs),
 
     /// Add a new worktree.
+    ///
+    /// This command tries to guess what you want, and as a result the behavior can be a little bit
+    /// subtle! If given, the `--branch` argument will always create a new branch, and the
+    /// `COMMITISH` argument will always be checked out in the new worktree; use those to
+    /// disambiguate when necessary.
     ///
     /// Unlike `git worktree add`, this will set new worktrees to start at and track the default
     /// branch by default, rather than the checked out commit or branch of the worktree the command
@@ -69,9 +85,7 @@ pub enum Command {
 
 #[derive(Args, Clone, Debug)]
 pub struct ConvertArgs {
-    /// A default branch to use as the main checkout.
-    ///
-    /// The `.git` directory will live in this worktree.
+    /// A default branch to create a worktree for.
     #[arg(long)]
     pub default_branch: Option<String>,
 }
@@ -99,6 +113,9 @@ pub struct AddArgs {
     pub inner: AddArgsInner,
 
     /// The commit to check out in the new worktree.
+    ///
+    /// If this is the name of a unique remote branch, then a local branch with the same name will
+    /// be created to track the remote branch.
     #[arg()]
     pub commitish: Option<String>,
 
@@ -129,8 +146,10 @@ pub struct AddArgsInner {
 
     /// The new worktree's name or path.
     ///
-    /// If this doesn't contain a `/`, it's assumed to be a directory name, and the worktree
-    /// will be placed adjacent to the other worktrees.
+    /// If the name contains a `/`, it's assumed to be a path. Otherwise, it's assumed to be a
+    /// worktree name: it's used as a name in the same directory as the other worktrees, and (by
+    /// default) a branch with that name is checked out or created. (When this is a path, only the
+    /// last component of the path is used as the branch name.)
     #[arg()]
     pub name_or_path: Option<String>,
 }
