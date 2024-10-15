@@ -40,8 +40,12 @@ pub struct Worktrees {
 }
 
 impl Worktrees {
-    pub fn main(&self) -> &Utf8Path {
+    pub fn main_path(&self) -> &Utf8Path {
         &self.main
+    }
+
+    pub fn main(&self) -> &Worktree {
+        self.inner.get(&self.main).unwrap()
     }
 
     pub fn into_main(mut self) -> Worktree {
@@ -317,7 +321,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(worktrees.main(), "/path/to/bare-source");
+        assert_eq!(worktrees.main_path(), "/path/to/bare-source");
 
         let worktrees = worktrees
             .inner
