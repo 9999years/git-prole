@@ -33,7 +33,8 @@ use crate::ResolvedCommitish;
 /// Exactly one of the worktrees is the main worktree.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Worktrees {
-    /// The path of the main worktree. This contains the common `.git` directory.
+    /// The path of the main worktree. This contains the common `.git` directory, or, in the
+    /// case of a bare repository, _is_ a `.git` directory.
     main: Utf8PathBuf,
     /// A map from worktree paths to worktree information.
     inner: HashMap<Utf8PathBuf, Worktree>,
