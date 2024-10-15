@@ -4,14 +4,16 @@ use test_harness::GitProle;
 use test_harness::WorktreeState;
 
 #[test]
-fn clone_simple() {
-    let prole = GitProle::new().unwrap();
-    prole.setup_repo("remote/my-repo").unwrap();
+fn clone_simple() -> miette::Result<()> {
+    let prole = GitProle::new()?;
+    prole.setup_repo("remote/my-repo")?;
     prole
         .cmd()
         .args(["clone", "remote/my-repo"])
         .status_checked()
         .unwrap();
+
+    prole.sh("ls -la && ls -la my-repo")?;
 
     prole
         .repo_state("my-repo")
@@ -25,4 +27,6 @@ fn clone_simple() {
             ),
         ])
         .assert();
+
+    Ok(())
 }

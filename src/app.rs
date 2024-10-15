@@ -50,6 +50,7 @@ impl App {
                 self.git()?,
                 ConvertPlanOpts {
                     default_branch: args.default_branch.clone(),
+                    destination: args.destination.clone(),
                 },
             )?
             .execute()?,

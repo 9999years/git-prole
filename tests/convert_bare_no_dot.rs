@@ -4,20 +4,25 @@ use test_harness::GitProle;
 use test_harness::WorktreeState;
 
 #[test]
-fn convert_multiple_worktrees() -> miette::Result<()> {
+fn convert_bare_no_dot() -> miette::Result<()> {
     let prole = GitProle::new()?;
-    prole.setup_repo("my-repo")?;
-
-    prole.sh("
-        # Another path here keeps `git-prole` from using the tempdir as the root.
-        mkdir my-other-repo
+    prole.sh(r#"
+        mkdir -p my-repo
         cd my-repo || exit
+        git init --bare
+
+        git worktree add ../main
+        cd ../main || exit
+        echo "puppy doggy" > README.md 
+        git add .
+        git commit -m "Initial commit"
+
         git worktree add ../puppy
-        git worktree add ../doggy
-        ")?;
+        git worktree add --detach ../doggy
+        "#)?;
 
     prole
-        .cd_cmd("my-repo")
+        .cd_cmd("main")
         .arg("convert")
         .status_checked()
         .into_diagnostic()?;
@@ -28,7 +33,7 @@ fn convert_multiple_worktrees() -> miette::Result<()> {
             WorktreeState::new_bare(),
             WorktreeState::new("main").branch("main"),
             WorktreeState::new("puppy").branch("puppy"),
-            WorktreeState::new("doggy").branch("doggy"),
+            WorktreeState::new("doggy").detached("4023d080"),
         ])
         .assert();
 

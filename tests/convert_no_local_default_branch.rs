@@ -1,20 +1,19 @@
 use command_error::CommandExt;
 use miette::IntoDiagnostic;
+use test_harness::setup_repo_multiple_remotes;
 use test_harness::GitProle;
 use test_harness::WorktreeState;
 
 #[test]
-fn convert_multiple_worktrees() -> miette::Result<()> {
+fn convert_no_local_default_branch() -> miette::Result<()> {
     let prole = GitProle::new()?;
-    prole.setup_repo("my-repo")?;
+    setup_repo_multiple_remotes(&prole, "my-remotes/my-repo", "my-repo")?;
 
-    prole.sh("
-        # Another path here keeps `git-prole` from using the tempdir as the root.
-        mkdir my-other-repo
+    prole.sh(r#"
         cd my-repo || exit
-        git worktree add ../puppy
-        git worktree add ../doggy
-        ")?;
+        git switch -c puppy
+        git branch -D main
+    "#)?;
 
     prole
         .cd_cmd("my-repo")
@@ -26,9 +25,10 @@ fn convert_multiple_worktrees() -> miette::Result<()> {
         .repo_state("my-repo")
         .worktrees([
             WorktreeState::new_bare(),
-            WorktreeState::new("main").branch("main"),
+            WorktreeState::new("main")
+                .branch("main")
+                .upstream("origin/main"),
             WorktreeState::new("puppy").branch("puppy"),
-            WorktreeState::new("doggy").branch("doggy"),
         ])
         .assert();
 

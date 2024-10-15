@@ -42,6 +42,7 @@ pub fn clone(git: AppGit<'_>, args: CloneArgs) -> miette::Result<()> {
         git.with_directory(destination),
         ConvertPlanOpts {
             default_branch: None,
+            destination: None,
         },
     )?
     .execute()?;
