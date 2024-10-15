@@ -127,6 +127,30 @@ impl WorktreeHead {
         }
     }
 
+    pub fn commitish(&self) -> Option<ResolvedCommitish> {
+        match self {
+            WorktreeHead::Bare => None,
+            WorktreeHead::Detached(commit) => Some(ResolvedCommitish::Commit(commit.clone())),
+            WorktreeHead::Branch(_, branch) => Some(ResolvedCommitish::Ref(branch.deref().clone())),
+        }
+    }
+
+    pub fn branch(&self) -> Option<&LocalBranchRef> {
+        match &self {
+            WorktreeHead::Bare => None,
+            WorktreeHead::Detached(_) => None,
+            WorktreeHead::Branch(_, branch) => Some(branch),
+        }
+    }
+
+    pub fn is_bare(&self) -> bool {
+        matches!(&self, WorktreeHead::Bare)
+    }
+
+    pub fn is_detached(&self) -> bool {
+        matches!(&self, WorktreeHead::Detached(_))
+    }
+
     pub fn parser(input: &mut &str) -> PResult<Self> {
         alt(("bare\0".map(|_| Self::Bare), Self::parse_non_bare)).parse_next(input)
     }
