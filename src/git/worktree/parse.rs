@@ -13,13 +13,20 @@ use winnow::combinator::cut_err;
 use winnow::combinator::eof;
 use winnow::combinator::opt;
 use winnow::combinator::repeat_till;
+use winnow::error::AddContext;
+use winnow::error::ContextError;
+use winnow::error::ErrMode;
+use winnow::error::StrContextValue;
+use winnow::stream::Stream as _;
 use winnow::PResult;
 use winnow::Parser;
 
 use crate::parse::till_null;
 use crate::CommitHash;
+use crate::LocalBranchRef;
 use crate::NormalPath;
 use crate::Ref;
+use crate::ResolvedCommitish;
 
 /// A set of Git worktrees.
 ///
@@ -97,7 +104,7 @@ impl Display for Worktrees {
 pub enum WorktreeHead {
     Bare,
     Detached(CommitHash),
-    Branch(CommitHash, Ref),
+    Branch(CommitHash, LocalBranchRef),
 }
 
 impl WorktreeHead {
@@ -124,9 +131,21 @@ impl WorktreeHead {
         })
     }
 
-    fn parse_branch(input: &mut &str) -> PResult<Option<Ref>> {
+    fn parse_branch(input: &mut &str) -> PResult<Option<LocalBranchRef>> {
         let _ = "branch ".parse_next(input)?;
-        let ref_name = cut_err(till_null.and_then(Ref::parser)).parse_next(input)?;
+        let before_branch = input.checkpoint();
+        let ref_name = cut_err(till_null.and_then(Ref::parser))
+            .parse_next(input)?
+            .try_into()
+            .map_err(|_err| {
+                ErrMode::Cut(ContextError::new().add_context(
+                    input,
+                    &before_branch,
+                    winnow::error::StrContext::Expected(StrContextValue::Description(
+                        "a branch ref",
+                    )),
+                ))
+            })?;
 
         Ok(Some(ref_name))
     }
@@ -313,7 +332,7 @@ mod tests {
                     path: "/Users/wiggles/cabal/accept".into(),
                     head: WorktreeHead::Branch(
                         CommitHash::from("0685cb3fec8b7144f865638cfd16768e15125fc2"),
-                        Ref::from_str("refs/heads/rebeccat/fix-accept-flag").unwrap(),
+                        LocalBranchRef::from_str("refs/heads/rebeccat/fix-accept-flag").unwrap(),
                     ),
                     is_main: false,
                     locked: None,
@@ -339,7 +358,7 @@ mod tests {
                     path: "/path/to/linked-worktree-locked-no-reason".into(),
                     head: WorktreeHead::Branch(
                         CommitHash::from("5678abc5678abc5678abc5678abc5678abc5678c"),
-                        Ref::from_str("refs/heads/locked-no-reason").unwrap()
+                        LocalBranchRef::from_str("refs/heads/locked-no-reason").unwrap()
                     ),
                     is_main: false,
                     locked: Some("".into()),
@@ -349,7 +368,7 @@ mod tests {
                     path: "/path/to/linked-worktree-locked-with-reason".into(),
                     head: WorktreeHead::Branch(
                         CommitHash::from("3456def3456def3456def3456def3456def3456b"),
-                        Ref::from_str("refs/heads/locked-with-reason").unwrap()
+                        LocalBranchRef::from_str("refs/heads/locked-with-reason").unwrap()
                     ),
                     is_main: false,
                     locked: Some("reason why is locked".into()),
