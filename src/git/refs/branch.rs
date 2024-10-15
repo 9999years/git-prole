@@ -1,5 +1,6 @@
 use std::fmt::Display;
 use std::ops::Deref;
+use std::str::FromStr;
 
 use miette::miette;
 
@@ -30,6 +31,13 @@ impl BranchRef {
         match &self {
             BranchRef::Local(ref_name) => ref_name.branch_name(),
             BranchRef::Remote(ref_name) => ref_name.branch_name(),
+        }
+    }
+
+    pub fn as_local(&self) -> LocalBranchRef {
+        match self {
+            BranchRef::Local(local) => local.clone(),
+            BranchRef::Remote(remote) => remote.as_local(),
         }
     }
 }
@@ -69,6 +77,14 @@ impl TryFrom<Ref> for BranchRef {
             Ref::REMOTES => Ok(Self::Remote(RemoteBranchRef::try_from(value)?)),
             _ => Err(miette!("Ref is not a local or remote branch: {value}")),
         }
+    }
+}
+
+impl FromStr for BranchRef {
+    type Err = miette::Report;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ref::from_str(s)?.try_into()
     }
 }
 
