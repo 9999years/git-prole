@@ -163,14 +163,7 @@ impl<'a> GitWorktree<'a> {
     /// TODO: Should support some configurable regex filtering or other logic?
     pub fn dirname_for<'b>(&self, branch: &'b str) -> &'b str {
         match branch.rsplit_once('/') {
-            Some((_left, right)) => {
-                tracing::warn!(
-                    %branch,
-                    worktree = %right,
-                    "Branch contains a `/`, using trailing component for worktree directory name"
-                );
-                right
-            }
+            Some((_left, right)) => right,
             None => branch,
         }
     }
