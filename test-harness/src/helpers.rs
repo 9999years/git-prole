@@ -22,6 +22,8 @@ pub fn setup_repo_multiple_remotes(
             cp -r "{basename}" "$repo"
             pushd "$repo" || exit
             git switch -c "$repo"
+            echo "I am on branch $repo" > README.md
+            git commit -am "Update README.md"
             git branch -D main
             popd || exit
             popd || exit
