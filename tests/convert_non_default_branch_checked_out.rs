@@ -1,8 +1,8 @@
 use command_error::CommandExt;
 use expect_test::expect;
 use miette::IntoDiagnostic;
-use pretty_assertions::assert_eq;
 use test_harness::GitProle;
+use test_harness::WorktreeState;
 
 #[test]
 fn convert_non_default_branch_checked_out() -> miette::Result<()> {
@@ -22,29 +22,24 @@ fn convert_non_default_branch_checked_out() -> miette::Result<()> {
         .status_checked()
         .into_diagnostic()?;
 
-    prole.assert_contents(&[
-        (
-            "my-repo/main/README.md",
-            expect![[r#"
-                puppy doggy
-            "#]],
-        ),
-        (
-            "my-repo/puppy/README.md",
-            expect![[r#"
-                softie cutie
-            "#]],
-        ),
-    ]);
-
-    assert_eq!(
-        prole
-            .git("my-repo/.git")
-            .config()
-            .get("core.bare")?
-            .unwrap(),
-        "true"
-    );
+    prole
+        .repo_state("my-repo")
+        .worktrees([
+            WorktreeState::new_bare(),
+            WorktreeState::new("main").branch("main").file(
+                "README.md",
+                expect![[r#"
+                    puppy doggy
+                "#]],
+            ),
+            WorktreeState::new("puppy").branch("puppy").file(
+                "README.md",
+                expect![[r#"
+                    softie cutie
+                "#]],
+            ),
+        ])
+        .assert();
 
     Ok(())
 }

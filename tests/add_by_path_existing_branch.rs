@@ -1,7 +1,7 @@
 use command_error::CommandExt;
 use expect_test::expect;
-use pretty_assertions::assert_eq;
 use test_harness::GitProle;
+use test_harness::WorktreeState;
 
 #[test]
 fn add_by_path_existing_branch() {
@@ -26,18 +26,21 @@ fn add_by_path_existing_branch() {
         .status_checked()
         .unwrap();
 
-    prole.assert_contents(&[(
-        "puppy/README.md",
-        expect![[r#"
-            softy pup
-        "#]],
-    )]);
-
-    // Last component of the path becomes the branch name.
-    assert_eq!(prole.current_branch_in("puppy").unwrap(), "puppy");
-
-    assert_eq!(
-        prole.upstream_for_branch_in("puppy", "puppy").unwrap(),
-        "main"
-    );
+    prole
+        .repo_state("my-repo")
+        .worktrees([
+            WorktreeState::new_bare(),
+            WorktreeState::new("main").branch("main"),
+            WorktreeState::new("../puppy")
+                // Last component of the path becomes the branch name.
+                .branch("puppy")
+                .upstream("main")
+                .file(
+                    "README.md",
+                    expect![[r#"
+                        softy pup
+                    "#]],
+                ),
+        ])
+        .assert();
 }

@@ -1,7 +1,9 @@
 use command_error::CommandExt;
+use expect_test::expect;
 use miette::IntoDiagnostic;
 use test_harness::setup_repo_multiple_remotes;
 use test_harness::GitProle;
+use test_harness::WorktreeState;
 
 #[test]
 fn convert_multiple_remotes() -> miette::Result<()> {
@@ -23,11 +25,24 @@ fn convert_multiple_remotes() -> miette::Result<()> {
         .status_checked()
         .into_diagnostic()?;
 
-    assert_eq!(prole.current_branch_in("my-repo/a")?, "a");
-    assert_eq!(
-        prole.upstream_for_branch_in("my-repo/a", "a")?,
-        "upstream/a"
-    );
+    prole
+        .repo_state("my-repo")
+        .worktrees([
+            WorktreeState::new_bare(),
+            WorktreeState::new("main")
+                .branch("main")
+                .upstream("origin/main"),
+            WorktreeState::new("a")
+                .branch("a")
+                .upstream("upstream/a")
+                .file(
+                    "README.md",
+                    expect![[r#"
+                        I am on branch a
+                    "#]],
+                ),
+        ])
+        .assert();
 
     Ok(())
 }

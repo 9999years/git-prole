@@ -1,6 +1,7 @@
 use command_error::CommandExt;
 use miette::IntoDiagnostic;
 use test_harness::GitProle;
+use test_harness::WorktreeState;
 
 #[test]
 fn config_default_branches() -> miette::Result<()> {
@@ -36,19 +37,21 @@ fn config_default_branches() -> miette::Result<()> {
         .status_checked()
         .into_diagnostic()?;
 
-    // We can't find a default remote, so we look for a default branch.
-    assert_eq!(prole.current_branch_in("my-repo/trunk")?, "trunk");
-    assert_eq!(
-        prole.upstream_for_branch_in("my-repo/trunk", "trunk")?,
-        "elephant/trunk"
-    );
-    // We also get a checkout for the default HEAD on the remote when we clone, so that
-    // sticks around.
-    assert_eq!(prole.current_branch_in("my-repo/puppy")?, "puppy");
-    assert_eq!(
-        prole.upstream_for_branch_in("my-repo/puppy", "puppy")?,
-        "elephant/puppy"
-    );
+    prole
+        .repo_state("my-repo")
+        .worktrees([
+            WorktreeState::new_bare(),
+            // We can't find a default remote, so we look for a default branch.
+            WorktreeState::new("trunk")
+                .branch("trunk")
+                .upstream("elephant/trunk"),
+            // We also get a checkout for the default HEAD on the remote when we clone, so that
+            // sticks around.
+            WorktreeState::new("puppy")
+                .branch("puppy")
+                .upstream("elephant/puppy"),
+        ])
+        .assert();
 
     Ok(())
 }

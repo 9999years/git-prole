@@ -1,7 +1,7 @@
 use command_error::CommandExt;
 use expect_test::expect;
-use pretty_assertions::assert_eq;
 use test_harness::GitProle;
+use test_harness::WorktreeState;
 
 #[test]
 fn add_start_point_existing_local() {
@@ -25,12 +25,20 @@ fn add_start_point_existing_local() {
         .status_checked()
         .unwrap();
 
-    prole.assert_contents(&[(
-        "my-repo/puppy/README.md",
-        expect![[r#"
-            cutie puppy
-        "#]],
-    )]);
-
-    assert_eq!(prole.current_branch_in("my-repo/puppy").unwrap(), "doggy");
+    prole
+        .repo_state("my-repo")
+        .worktrees([
+            WorktreeState::new_bare(),
+            WorktreeState::new("main").branch("main"),
+            WorktreeState::new("puppy")
+                .branch("doggy")
+                .no_upstream()
+                .file(
+                    "README.md",
+                    expect![[r#"
+                        cutie puppy
+                    "#]],
+                ),
+        ])
+        .assert();
 }

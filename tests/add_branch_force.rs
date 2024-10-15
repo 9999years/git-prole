@@ -1,7 +1,7 @@
 use command_error::CommandExt;
 use expect_test::expect;
-use pretty_assertions::assert_eq;
 use test_harness::GitProle;
+use test_harness::WorktreeState;
 
 #[test]
 fn add_branch_force() {
@@ -32,13 +32,26 @@ fn add_branch_force() {
         .status_checked()
         .unwrap();
 
-    // Branch is reset, so we don't see the updated readme.
-    prole.assert_contents(&[(
-        "my-repo/puppy/README.md",
-        expect![[r#"
-            puppy doggy
-        "#]],
-    )]);
-
-    assert_eq!(prole.current_branch_in("my-repo/puppy").unwrap(), "puppy");
+    prole
+        .repo_state("my-repo")
+        .worktrees([
+            WorktreeState::new_bare(),
+            WorktreeState::new("main").branch("main").file(
+                "README.md",
+                expect![[r#"
+                    puppy doggy
+                "#]],
+            ),
+            WorktreeState::new("puppy")
+                .branch("puppy")
+                .no_upstream()
+                .file(
+                    "README.md",
+                    // Branch is reset, so we don't see the updated readme.
+                    expect![[r#"
+                        puppy doggy
+                    "#]],
+                ),
+        ])
+        .assert();
 }
