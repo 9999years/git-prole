@@ -15,8 +15,11 @@ use miette::Context;
 use miette::IntoDiagnostic;
 
 mod helpers;
+mod repo_state;
 
 pub use helpers::*;
+pub use repo_state::RepoState;
+pub use repo_state::WorktreeState;
 
 /// `git-prole` session for integration testing.
 pub struct GitProle {
@@ -222,5 +225,12 @@ impl GitProle {
             .into_diagnostic()
             .wrap_err("Failed to write `git-prole` configuration")?;
         Ok(())
+    }
+
+    /// Construct a repository state which a real repository can be checked against.
+    ///
+    /// The repository state will rooted in the given directory.
+    pub fn repo_state(&self, root: &str) -> RepoState {
+        RepoState::new(self.git(root))
     }
 }
