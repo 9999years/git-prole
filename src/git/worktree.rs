@@ -378,14 +378,12 @@ pub struct Worktree {
 
 impl Display for Worktree {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let path = NormalPath::from_cwd(&self.path)
-            .map(|path| path.to_string())
-            .unwrap_or_else(|_| {
-                self.path
-                    .if_supports_color(Stream::Stdout, |text| text.cyan())
-                    .to_string()
-            });
-        write!(f, "{path} {}", self.head)?;
+        write!(
+            f,
+            "{} {}",
+            NormalPath::try_display_cwd(&self.path),
+            self.head
+        )?;
 
         if self.is_main {
             write!(

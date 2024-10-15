@@ -12,6 +12,7 @@ use common_path::common_path;
 use miette::miette;
 use miette::IntoDiagnostic;
 use owo_colors::OwoColorize;
+use owo_colors::Stream;
 use owo_colors::Stream::Stdout;
 use path_absolutize::Absolutize;
 
@@ -33,6 +34,17 @@ pub struct NormalPath {
 }
 
 impl NormalPath {
+    pub fn try_display_cwd(original: impl AsRef<Utf8Path>) -> String {
+        let original = original.as_ref();
+        Self::from_cwd(original)
+            .map(|normal_path| normal_path.to_string())
+            .unwrap_or_else(|_| {
+                original
+                    .if_supports_color(Stream::Stdout, |text| text.cyan())
+                    .to_string()
+            })
+    }
+
     /// Creates a new normalized path relative to the given base path.
     pub fn new(original: impl AsRef<Path>, base: impl AsRef<Utf8Path>) -> miette::Result<Self> {
         let base = base.as_ref();
