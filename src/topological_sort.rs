@@ -14,7 +14,6 @@ use rustc_hash::FxHashSet as HashSet;
 /// This implements Kahn's algorithm.
 ///
 /// See: <https://en.wikipedia.org/wiki/Topological_sorting#Kahn's_algorithm>
-#[cfg_attr(not(test), expect(dead_code))]
 pub fn topological_sort<P>(paths: &[P]) -> miette::Result<Vec<Utf8PathBuf>>
 where
     P: AsRef<Utf8Path>,

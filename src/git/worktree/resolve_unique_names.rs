@@ -23,7 +23,7 @@ pub struct ResolveUniqueNameOpts<'a> {
     ///
     /// This is used to prevent worktree paths like `my-repo/my-repo` for detached `HEAD`
     /// worktrees.
-    pub directory_names: &'a HashSet<String>,
+    pub directory_names: &'a HashSet<&'a str>,
 }
 
 /// When we convert a repository into a worktree checkout, we put all the worktrees in one
@@ -122,11 +122,11 @@ pub struct RenamedWorktree {
 struct WorktreeNames<'a> {
     git: &'a Git,
     worktree: &'a Worktree,
-    directory_names: &'a HashSet<String>,
+    directory_names: &'a HashSet<&'a str>,
 }
 
 impl<'a> WorktreeNames<'a> {
-    fn new(git: &'a Git, worktree: &'a Worktree, directory_names: &'a HashSet<String>) -> Self {
+    fn new(git: &'a Git, worktree: &'a Worktree, directory_names: &'a HashSet<&'a str>) -> Self {
         Self {
             git,
             worktree,
@@ -239,11 +239,7 @@ mod tests {
                 ResolveUniqueNameOpts {
                     worktrees,
                     names: self.names.into_iter().map(|name| name.to_owned()).collect(),
-                    directory_names: &self
-                        .directory_names
-                        .into_iter()
-                        .map(|name| name.to_owned())
-                        .collect(),
+                    directory_names: &self.directory_names.into_iter().collect(),
                 },
             )
             .unwrap()

@@ -1,6 +1,7 @@
 use command_error::CommandExt;
 use miette::IntoDiagnostic;
 use test_harness::GitProle;
+use test_harness::WorktreeState;
 
 #[test]
 fn convert_multiple_worktrees() -> miette::Result<()> {
@@ -17,9 +18,17 @@ fn convert_multiple_worktrees() -> miette::Result<()> {
         .cd_cmd("my-repo")
         .arg("convert")
         .status_checked()
-        .into_diagnostic()
-        // Not implemented yet!
-        .unwrap_err();
+        .into_diagnostic()?;
+
+    prole
+        .repo_state("my-repo")
+        .worktrees([
+            WorktreeState::new_bare(),
+            WorktreeState::new("main").branch("main"),
+            WorktreeState::new("puppy").branch("puppy"),
+            WorktreeState::new("doggy").branch("doggy"),
+        ])
+        .assert();
 
     Ok(())
 }
