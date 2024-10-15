@@ -2,6 +2,7 @@ use command_error::CommandExt;
 use expect_test::expect;
 use miette::IntoDiagnostic;
 use test_harness::GitProle;
+use test_harness::WorktreeState;
 
 #[test]
 fn config_copy_untracked_default() -> miette::Result<()> {
@@ -21,20 +22,33 @@ fn config_copy_untracked_default() -> miette::Result<()> {
         .into_diagnostic()?;
 
     // The untracked file is copied to the new worktree.
-    prole.assert_contents(&[
-        (
-            "my-repo/main/animal-facts.txt",
-            expect![[r#"
-                puppy doggy
-            "#]],
-        ),
-        (
-            "my-repo/puppy/animal-facts.txt",
-            expect![[r#"
-                puppy doggy
-            "#]],
-        ),
-    ]);
+
+    prole
+        .repo_state("my-repo")
+        .worktrees([
+            WorktreeState::new_bare(),
+            WorktreeState::new("main")
+                .branch("main")
+                .file(
+                    "animal-facts.txt",
+                    expect![[r#"
+                        puppy doggy
+                    "#]],
+                )
+                .status(["?? animal-facts.txt"]),
+            WorktreeState::new("puppy")
+                .branch("puppy")
+                .upstream("main")
+                // The untracked file is copied to the new worktree.
+                .file(
+                    "animal-facts.txt",
+                    expect![[r#"
+                        puppy doggy
+                    "#]],
+                )
+                .status(["?? animal-facts.txt"]),
+        ])
+        .assert();
 
     Ok(())
 }

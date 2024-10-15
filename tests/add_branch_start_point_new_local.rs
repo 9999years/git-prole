@@ -1,7 +1,7 @@
 use command_error::CommandExt;
 use expect_test::expect;
-use pretty_assertions::assert_eq;
 use test_harness::GitProle;
+use test_harness::WorktreeState;
 
 #[test]
 fn add_branch_start_point_new_local() {
@@ -23,12 +23,21 @@ fn add_branch_start_point_new_local() {
         .status_checked()
         .unwrap();
 
-    prole.assert_contents(&[(
-        "my-repo/doggy/README.md",
-        expect![[r#"
-            soft cutie
-        "#]],
-    )]);
-
-    assert_eq!(prole.current_branch_in("my-repo/doggy").unwrap(), "softy");
+    prole
+        .repo_state("my-repo")
+        .worktrees([
+            WorktreeState::new_bare(),
+            // We `git switch`ed from `main` earlier.
+            WorktreeState::new("main").branch("puppy"),
+            WorktreeState::new("doggy")
+                .branch("softy")
+                .no_upstream()
+                .file(
+                    "README.md",
+                    expect![[r#"
+                        soft cutie
+                    "#]],
+                ),
+        ])
+        .assert();
 }

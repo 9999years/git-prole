@@ -4,19 +4,19 @@ use std::process::Command;
 use camino::Utf8PathBuf;
 use clonable_command::Command as ClonableCommand;
 use command_error::CommandExt;
-use expect_test::Expect;
 use fs_err as fs;
-use git_prole::format_bulleted_list;
 use git_prole::Git;
 use git_prole::Utf8TempDir;
 use itertools::Itertools;
-use miette::miette;
 use miette::Context;
 use miette::IntoDiagnostic;
 
 mod helpers;
+mod repo_state;
 
 pub use helpers::*;
+pub use repo_state::RepoState;
+pub use repo_state::WorktreeState;
 
 /// `git-prole` session for integration testing.
 pub struct GitProle {
@@ -98,39 +98,6 @@ impl GitProle {
         self.tempdir.join(tail)
     }
 
-    pub fn exists(&self, path: &str) -> bool {
-        self.path(path).exists()
-    }
-
-    pub fn contents(&self, path: &str) -> miette::Result<String> {
-        fs::read_to_string(self.path(path)).into_diagnostic()
-    }
-
-    #[track_caller]
-    pub fn assert_exists(&self, paths: &[&str]) {
-        let mut missing = Vec::new();
-        for path in paths {
-            if !self.exists(path) {
-                missing.push(path);
-            }
-        }
-
-        if !missing.is_empty() {
-            panic!(
-                "{:?}",
-                miette!("Paths are missing:\n{}", format_bulleted_list(missing))
-            )
-        }
-    }
-
-    #[track_caller]
-    pub fn assert_contents(&self, contents: &[(&str, Expect)]) {
-        for (path, expect) in contents {
-            let actual = self.contents(path).unwrap();
-            expect.assert_eq(&actual);
-        }
-    }
-
     pub fn sh(&self, script: &str) -> miette::Result<()> {
         let tempfile = tempfile::NamedTempFile::new().into_diagnostic()?;
         fs::write(
@@ -165,26 +132,6 @@ impl GitProle {
             })
         }));
         git
-    }
-
-    pub fn current_branch_in(&self, directory: &str) -> miette::Result<String> {
-        Ok(self
-            .git(directory)
-            .branch()
-            .current()?
-            .ok_or_else(|| miette!("HEAD is detached in {directory}"))?
-            .branch_name()
-            .to_owned())
-    }
-
-    pub fn upstream_for_branch_in(&self, directory: &str, branch: &str) -> miette::Result<String> {
-        Ok(self
-            .git(directory)
-            .branch()
-            .upstream(branch)?
-            .ok_or_else(|| miette!("Branch {branch} has no upstream in {directory}"))?
-            .qualified_branch_name()
-            .to_owned())
     }
 
     /// Set up a new repository in `path` with a single commit.
@@ -222,5 +169,12 @@ impl GitProle {
             .into_diagnostic()
             .wrap_err("Failed to write `git-prole` configuration")?;
         Ok(())
+    }
+
+    /// Construct a repository state which a real repository can be checked against.
+    ///
+    /// The repository state will rooted in the given directory.
+    pub fn repo_state(&self, root: &str) -> RepoState {
+        RepoState::new(self.git(root))
     }
 }

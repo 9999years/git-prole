@@ -1,7 +1,7 @@
 use command_error::CommandExt;
 use expect_test::expect;
-use pretty_assertions::assert_eq;
 use test_harness::GitProle;
+use test_harness::WorktreeState;
 
 #[test]
 fn add_branch_and_name() {
@@ -14,19 +14,25 @@ fn add_branch_and_name() {
         .status_checked()
         .unwrap();
 
-    prole.assert_contents(&[(
-        "my-repo/puppy/README.md",
-        expect![[r#"
-            puppy doggy
-        "#]],
-    )]);
-
-    assert_eq!(prole.current_branch_in("my-repo/puppy").unwrap(), "doggy");
-
-    assert_eq!(
-        prole
-            .upstream_for_branch_in("my-repo/puppy", "doggy")
-            .unwrap(),
-        "main"
-    );
+    prole
+        .repo_state("my-repo")
+        .worktrees([
+            WorktreeState::new_bare(),
+            WorktreeState::new("main").branch("main").file(
+                "README.md",
+                expect![[r#"
+                    puppy doggy
+                "#]],
+            ),
+            WorktreeState::new("puppy")
+                .branch("doggy")
+                .upstream("main")
+                .file(
+                    "README.md",
+                    expect![[r#"
+                        puppy doggy
+                    "#]],
+                ),
+        ])
+        .assert();
 }

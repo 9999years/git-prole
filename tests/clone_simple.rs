@@ -1,6 +1,7 @@
 use command_error::CommandExt;
 use expect_test::expect;
 use test_harness::GitProle;
+use test_harness::WorktreeState;
 
 #[test]
 fn clone_simple() {
@@ -12,27 +13,16 @@ fn clone_simple() {
         .status_checked()
         .unwrap();
 
-    prole.assert_exists(&[
-        "my-repo",
-        "my-repo/.git",
-        "my-repo/main",
-        "my-repo/main/README.md",
-    ]);
-
-    assert_eq!(
-        prole
-            .git("my-repo/.git")
-            .config()
-            .get("core.bare")
-            .unwrap()
-            .unwrap(),
-        "true"
-    );
-
-    prole.assert_contents(&[(
-        "my-repo/main/README.md",
-        expect![[r#"
-            puppy doggy
-        "#]],
-    )]);
+    prole
+        .repo_state("my-repo")
+        .worktrees([
+            WorktreeState::new_bare(),
+            WorktreeState::new("main").branch("main").file(
+                "README.md",
+                expect![[r#"
+                        puppy doggy
+                    "#]],
+            ),
+        ])
+        .assert();
 }

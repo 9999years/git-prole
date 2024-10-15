@@ -1,7 +1,7 @@
 use command_error::CommandExt;
 use expect_test::expect;
-use pretty_assertions::assert_eq;
 use test_harness::GitProle;
+use test_harness::WorktreeState;
 
 #[test]
 fn add_branch_start_point_existing_remote() {
@@ -30,21 +30,20 @@ fn add_branch_start_point_existing_remote() {
         .status_checked()
         .unwrap();
 
-    // We get a checkout for the remote-tracking branch!
-    prole.assert_contents(&[(
-        "my-repo/doggy/README.md",
-        expect![[r#"
-            softy pup
-        "#]],
-    )]);
-
-    assert_eq!(prole.current_branch_in("my-repo/doggy").unwrap(), "softie");
-
-    // We're tracking the remote branch we expect.
-    assert_eq!(
-        prole
-            .upstream_for_branch_in("my-repo/doggy", "softie")
-            .unwrap(),
-        "origin/puppy"
-    );
+    prole
+        .repo_state("my-repo")
+        .worktrees([
+            WorktreeState::new_bare(),
+            WorktreeState::new("main").branch("main"),
+            WorktreeState::new("doggy")
+                .branch("softie")
+                .upstream("origin/puppy")
+                .file(
+                    "README.md",
+                    expect![[r#"
+                        softy pup
+                    "#]],
+                ),
+        ])
+        .assert();
 }
