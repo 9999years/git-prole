@@ -27,6 +27,7 @@ pub use app::App;
 pub use app_git::AppGit;
 pub use config::Config;
 pub use format_bulleted_list::format_bulleted_list;
+pub use format_bulleted_list::format_bulleted_list_multiline;
 pub use git::repository_url_destination;
 pub use git::AddWorktreeOpts;
 pub use git::BranchRef;
