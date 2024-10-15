@@ -53,6 +53,12 @@ impl Worktrees {
         self.inner.remove(&self.main).unwrap()
     }
 
+    pub fn for_branch(&self, branch: &LocalBranchRef) -> Option<&Worktree> {
+        self.iter()
+            .map(|(_path, worktree)| worktree)
+            .find(|worktree| worktree.head.branch() == Some(branch))
+    }
+
     pub fn parser(input: &mut &str) -> PResult<Self> {
         let mut main = Worktree::parser.parse_next(input)?;
         main.is_main = true;
