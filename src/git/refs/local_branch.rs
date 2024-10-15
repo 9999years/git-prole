@@ -1,6 +1,7 @@
 use std::fmt::Debug;
 use std::fmt::Display;
 use std::ops::Deref;
+use std::str::FromStr;
 
 use miette::miette;
 
@@ -55,6 +56,14 @@ impl TryFrom<Ref> for LocalBranchRef {
         } else {
             Err(miette!("Ref is not a local branch: {value}"))
         }
+    }
+}
+
+impl FromStr for LocalBranchRef {
+    type Err = miette::Report;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ref::from_str(s)?.try_into()
     }
 }
 
