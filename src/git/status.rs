@@ -1,4 +1,5 @@
 use std::fmt::Debug;
+use std::fmt::Display;
 use std::iter;
 use std::str::FromStr;
 
@@ -121,6 +122,27 @@ impl StatusCode {
     }
 }
 
+impl Display for StatusCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Unmodified => ' ',
+                Self::Modified => 'M',
+                Self::TypeChanged => 'T',
+                Self::Added => 'A',
+                Self::Deleted => 'D',
+                Self::Renamed => 'R',
+                Self::Copied => 'C',
+                Self::Unmerged => 'U',
+                Self::Untracked => '?',
+                Self::Ignored => '!',
+            }
+        )
+    }
+}
+
 /// The status of a particular file.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StatusEntry {
@@ -131,7 +153,7 @@ pub struct StatusEntry {
     ///
     /// If a merge conflict has occured and is not resolved, this is the left head of th
     /// merge.
-    left: StatusCode,
+    pub left: StatusCode,
     /// The status of the file in the working tree.
     ///
     /// If no merge is occurring, or a merge was successful, this indicates the status of the
@@ -139,9 +161,11 @@ pub struct StatusEntry {
     ///
     /// If a merge conflict has occured and is not resolved, this is the right head of th
     /// merge.
-    right: StatusCode,
-    path: Utf8PathBuf,
-    renamed_from: Option<Utf8PathBuf>,
+    pub right: StatusCode,
+    /// The path for this status entry.
+    pub path: Utf8PathBuf,
+    /// The path this status entry was renamed from, if any.
+    pub renamed_from: Option<Utf8PathBuf>,
 }
 
 impl StatusEntry {
@@ -190,6 +214,16 @@ impl FromStr for StatusEntry {
 
     fn from_str(input: &str) -> Result<Self, Self::Err> {
         Self::parser.parse(input).map_err(|err| miette!("{err}"))
+    }
+}
+
+impl Display for StatusEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{} ", self.left, self.right)?;
+        if let Some(renamed_from) = &self.renamed_from {
+            write!(f, "{renamed_from} -> ")?;
+        }
+        write!(f, "{}", self.path)
     }
 }
 
