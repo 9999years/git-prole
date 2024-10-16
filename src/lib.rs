@@ -45,6 +45,8 @@ pub use git::HeadKind;
 pub use git::LocalBranchRef;
 pub use git::Ref;
 pub use git::RemoteBranchRef;
+pub use git::RenamedWorktree;
+pub use git::ResolveUniqueNameOpts;
 pub use git::ResolvedCommitish;
 pub use git::Status;
 pub use git::StatusCode;

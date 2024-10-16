@@ -7,6 +7,7 @@ use command_error::CommandExt;
 use command_error::OutputContext;
 use miette::miette;
 use miette::IntoDiagnostic;
+use rustc_hash::FxHashMap as HashMap;
 use tap::Tap;
 use tracing::instrument;
 use utf8_command::Utf8Output;
@@ -15,10 +16,15 @@ use winnow::Parser;
 use super::Git;
 use super::LocalBranchRef;
 
+mod resolve_unique_names;
+
 mod parse;
+
 pub use parse::Worktree;
 pub use parse::WorktreeHead;
 pub use parse::Worktrees;
+pub use resolve_unique_names::RenamedWorktree;
+pub use resolve_unique_names::ResolveUniqueNameOpts;
 
 /// Git methods for dealing with worktrees.
 #[repr(transparent)]
@@ -176,6 +182,15 @@ impl<'a> GitWorktree<'a> {
         Ok(self
             .container()?
             .tap_mut(|p| p.push(self.dirname_for(branch))))
+    }
+
+    /// Resolves a set of worktrees into a map from worktree paths to unique names.
+    #[instrument(level = "trace")]
+    pub fn resolve_unique_names(
+        &self,
+        opts: ResolveUniqueNameOpts<'_>,
+    ) -> miette::Result<HashMap<Utf8PathBuf, RenamedWorktree>> {
+        resolve_unique_names::resolve_unique_worktree_names(self.0, opts)
     }
 }
 
