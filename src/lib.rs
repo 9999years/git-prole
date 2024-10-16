@@ -15,6 +15,7 @@ mod convert;
 mod copy_dir;
 mod current_dir;
 mod format_bulleted_list;
+pub mod fs;
 mod gh;
 mod git;
 mod install_tracing;

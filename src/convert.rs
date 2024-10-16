@@ -1,14 +1,13 @@
 use std::fmt::Display;
 
-use fs_err as fs;
 use miette::miette;
-use miette::IntoDiagnostic;
 use owo_colors::OwoColorize;
 use owo_colors::Stream;
 use tap::Tap;
 
 use crate::app_git::AppGit;
 use crate::format_bulleted_list::format_bulleted_list;
+use crate::fs;
 use crate::git::BranchRef;
 use crate::git::LocalBranchRef;
 use crate::normal_path::NormalPath;
@@ -173,7 +172,7 @@ impl<'a> ConvertPlan<'a> {
                 Step::MoveWorktree { from, to, is_main } => {
                     if *is_main {
                         // The main worktree cannot be moved with `git worktree move`.
-                        fs::rename(from, to).into_diagnostic()?;
+                        fs::rename(from, to)?;
                         self.git
                             .with_directory(to.as_path().to_owned())
                             .worktree()
@@ -183,10 +182,10 @@ impl<'a> ConvertPlan<'a> {
                     }
                 }
                 Step::CreateDir { path } => {
-                    fs::create_dir_all(path).into_diagnostic()?;
+                    fs::create_dir_all(path)?;
                 }
                 Step::Move { from, to } => {
-                    fs::rename(from, to).into_diagnostic()?;
+                    fs::rename(from, to)?;
                 }
                 Step::SetConfig { repo, key, value } => {
                     self.git
@@ -263,7 +262,7 @@ impl<'a> ConvertPlan<'a> {
                     self.git.with_directory(repo.as_path().to_owned()).reset()?;
                 }
                 Step::RemoveDirectory { path } => {
-                    fs::remove_dir(path).into_diagnostic()?;
+                    fs::remove_dir(path)?;
                 }
             }
         }

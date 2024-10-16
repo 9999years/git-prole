@@ -4,7 +4,7 @@ use std::process::Command;
 use camino::Utf8PathBuf;
 use clonable_command::Command as ClonableCommand;
 use command_error::CommandExt;
-use fs_err as fs;
+use git_prole::fs;
 use git_prole::Git;
 use git_prole::Utf8TempDir;
 use itertools::Itertools;
@@ -40,8 +40,7 @@ impl GitProle {
             [init]\n\
             defaultBranch = main\n\
             ",
-        )
-        .into_diagnostic()?;
+        )?;
 
         let git_prole = test_bin::get_test_bin("git-prole").get_program().to_owned();
 
@@ -106,8 +105,7 @@ impl GitProle {
                 "set -ex\n\
                 {script}"
             ),
-        )
-        .into_diagnostic()?;
+        )?;
         self.any_command("bash")
             .arg("--norc")
             .arg(tempfile.as_ref())
@@ -164,9 +162,8 @@ impl GitProle {
     }
 
     pub fn write_config(&self, contents: &str) -> miette::Result<()> {
-        fs::create_dir_all(self.path(".config/git-prole")).into_diagnostic()?;
+        fs::create_dir_all(self.path(".config/git-prole"))?;
         fs::write(self.path(".config/git-prole/config.toml"), contents)
-            .into_diagnostic()
             .wrap_err("Failed to write `git-prole` configuration")?;
         Ok(())
     }

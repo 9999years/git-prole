@@ -64,6 +64,7 @@ macro_rules! make_err {
 /// * Filesystem boundaries may be crossed.
 /// * Symbolic links will be copied, not followed.
 #[instrument(level = "trace", skip_all)]
+#[expect(clippy::disallowed_methods)]
 pub fn copy_dir<Q: AsRef<Path>, P: AsRef<Path>>(from: P, to: Q) -> Result<Vec<Error>> {
     if !from.as_ref().exists() {
         return Err(make_err!("source path does not exist", ErrorKind::NotFound));
@@ -186,6 +187,7 @@ pub fn copy_dir<Q: AsRef<Path>, P: AsRef<Path>>(from: P, to: Q) -> Result<Vec<Er
 #[cfg(test)]
 mod tests {
     #![allow(unused_variables)]
+    #![allow(clippy::disallowed_methods)]
 
     use fs_err as fs;
     use std::path::Path;

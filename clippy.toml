@@ -1,0 +1,79 @@
+[[disallowed-methods]]
+path = "std::process::Command::output"
+reason = "Use command_error::CommandExt::output_checked[_with][_utf8]"
+
+[[disallowed-methods]]
+path = "std::process::Command::status"
+reason = "Use command_error::CommandExt::status_checked[_with]"
+
+[[disallowed-methods]]
+path = "std::process::Command::spawn"
+reason = "Use command_error::CommandExt::spawn_checked"
+
+[[disallowed-methods]]
+path = "std::process::Child::try_wait"
+reason = "Use command_error::ChildExt::try_wait_checked[_with]"
+
+[[disallowed-methods]]
+path = "std::process::Child::wait"
+reason = "Use command_error::ChildExt::wait_checked[_with]"
+
+[[disallowed-methods]]
+path = "std::process::Child::wait_with_output"
+reason = "Use command_error::ChildExt::output_checked[_with][_utf8]"
+
+[[disallowed-methods]]
+path = "fs_err::rename"
+reason = "Use git_prole::fs::rename"
+
+[[disallowed-methods]]
+path = "std::fs::rename"
+reason = "Use git_prole::fs::rename"
+
+[[disallowed-methods]]
+path = "fs_err::create_dir_all"
+reason = "Use git_prole::fs::create_dir_all"
+
+[[disallowed-methods]]
+path = "std::fs::create_dir_all"
+reason = "Use git_prole::fs::create_dir_all"
+
+[[disallowed-methods]]
+path = "fs_err::create_dir"
+reason = "Use git_prole::fs::create_dir"
+
+[[disallowed-methods]]
+path = "std::fs::create_dir"
+reason = "Use git_prole::fs::create_dir"
+
+[[disallowed-methods]]
+path = "fs_err::remove_dir"
+reason = "Use git_prole::fs::remove_dir"
+
+[[disallowed-methods]]
+path = "std::fs::remove_dir"
+reason = "Use git_prole::fs::remove_dir"
+
+[[disallowed-methods]]
+path = "fs_err::read_to_string"
+reason = "Use git_prole::fs::read_to_string"
+
+[[disallowed-methods]]
+path = "std::fs::read_to_string"
+reason = "Use git_prole::fs::read_to_string"
+
+[[disallowed-methods]]
+path = "fs_err::copy"
+reason = "Use git_prole::fs::copy"
+
+[[disallowed-methods]]
+path = "std::fs::copy"
+reason = "Use git_prole::fs::copy"
+
+[[disallowed-methods]]
+path = "fs_err::write"
+reason = "Use git_prole::fs::copy"
+
+[[disallowed-methods]]
+path = "std::fs::write"
+reason = "Use git_prole::fs::copy"

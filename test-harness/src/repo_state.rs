@@ -4,8 +4,8 @@ use std::str::FromStr;
 
 use camino::Utf8PathBuf;
 use expect_test::Expect;
-use fs_err as fs;
 use git_prole::format_bulleted_list_multiline;
+use git_prole::fs;
 use git_prole::BranchRef;
 use git_prole::Git;
 use git_prole::LocalBranchRef;
