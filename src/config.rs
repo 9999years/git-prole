@@ -1,12 +1,12 @@
 use camino::Utf8PathBuf;
 use clap::Parser;
-use fs_err as fs;
 use miette::Context;
 use miette::IntoDiagnostic;
 use serde::Deserialize;
 use xdg::BaseDirectories;
 
 use crate::cli::Cli;
+use crate::fs;
 use crate::install_tracing::install_tracing;
 
 /// Configuration, both from the command-line and a user configuration file.
@@ -45,9 +45,7 @@ impl Config {
                 ConfigFile::default()
             } else {
                 toml::from_str(
-                    &fs::read_to_string(&path)
-                        .into_diagnostic()
-                        .wrap_err("Failed to read configuration file")?,
+                    &fs::read_to_string(&path).wrap_err("Failed to read configuration file")?,
                 )
                 .into_diagnostic()
                 .wrap_err("Failed to deserialize configuration file")?

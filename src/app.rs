@@ -1,6 +1,5 @@
 use calm_io::stdout;
 use clap::CommandFactory;
-use fs_err as fs;
 use miette::miette;
 use miette::IntoDiagnostic;
 
@@ -12,6 +11,7 @@ use crate::cli::ConfigGenerateArgs;
 use crate::config::Config;
 use crate::convert::ConvertPlan;
 use crate::convert::ConvertPlanOpts;
+use crate::fs;
 use crate::git::Git;
 
 pub struct App {
@@ -86,10 +86,10 @@ impl App {
         );
 
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).into_diagnostic()?;
+            fs::create_dir_all(parent)?;
         }
 
-        fs::write(path, Config::DEFAULT).into_diagnostic()?;
+        fs::write(path, Config::DEFAULT)?;
 
         Ok(())
     }
