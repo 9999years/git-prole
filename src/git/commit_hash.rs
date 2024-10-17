@@ -15,6 +15,12 @@ use winnow::Parser;
 pub struct CommitHash(String);
 
 impl CommitHash {
+    /// A fake commit hash for testing purposes.
+    #[cfg(test)]
+    pub fn fake() -> Self {
+        Self("a".repeat(40))
+    }
+
     /// Get an abbreviated 8-character Git hash.
     pub fn abbrev(&self) -> &str {
         &self.0[..8]

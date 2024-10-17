@@ -35,9 +35,9 @@ use crate::ResolvedCommitish;
 pub struct Worktrees {
     /// The path of the main worktree. This contains the common `.git` directory, or, in the
     /// case of a bare repository, _is_ a `.git` directory.
-    main: Utf8PathBuf,
+    pub(crate) main: Utf8PathBuf,
     /// A map from worktree paths to worktree information.
-    inner: HashMap<Utf8PathBuf, Worktree>,
+    pub(crate) inner: HashMap<Utf8PathBuf, Worktree>,
 }
 
 impl Worktrees {
@@ -51,6 +51,10 @@ impl Worktrees {
 
     pub fn into_main(mut self) -> Worktree {
         self.inner.remove(&self.main).unwrap()
+    }
+
+    pub fn into_inner(self) -> HashMap<Utf8PathBuf, Worktree> {
+        self.inner
     }
 
     pub fn for_branch(&self, branch: &LocalBranchRef) -> Option<&Worktree> {
@@ -277,6 +281,61 @@ impl Worktree {
         })
     }
 
+    #[cfg(test)]
+    pub fn new_bare(path: impl Into<Utf8PathBuf>) -> Self {
+        Self {
+            path: path.into(),
+            head: WorktreeHead::Bare,
+            is_main: true,
+            locked: None,
+            prunable: None,
+        }
+    }
+
+    #[cfg(test)]
+    pub fn new_detached(path: impl Into<Utf8PathBuf>, commit: impl Into<CommitHash>) -> Self {
+        Self {
+            path: path.into(),
+            head: WorktreeHead::Detached(commit.into()),
+            is_main: false,
+            locked: None,
+            prunable: None,
+        }
+    }
+
+    #[cfg(test)]
+    pub fn new_branch(
+        path: impl Into<Utf8PathBuf>,
+        commit: impl Into<CommitHash>,
+        branch: impl Into<LocalBranchRef>,
+    ) -> Self {
+        Self {
+            path: path.into(),
+            head: WorktreeHead::Branch(commit.into(), branch.into()),
+            is_main: false,
+            locked: None,
+            prunable: None,
+        }
+    }
+
+    #[cfg(test)]
+    pub fn with_is_main(mut self, is_main: bool) -> Self {
+        self.is_main = is_main;
+        self
+    }
+
+    #[cfg(test)]
+    pub fn with_locked(mut self, locked: impl Into<String>) -> Self {
+        self.locked = Some(locked.into());
+        self
+    }
+
+    #[cfg(test)]
+    pub fn with_prunable(mut self, prunable: impl Into<String>) -> Self {
+        self.prunable = Some(prunable.into());
+        self
+    }
+
     fn parse_locked(input: &mut &str) -> PResult<String> {
         let _ = "locked".parse_next(input)?;
         let reason = Self::parse_reason.parse_next(input)?;
@@ -363,61 +422,33 @@ mod tests {
         assert_eq!(
             worktrees,
             vec![
-                Worktree {
-                    path: "/Users/wiggles/cabal/accept".into(),
-                    head: WorktreeHead::Branch(
-                        CommitHash::from("0685cb3fec8b7144f865638cfd16768e15125fc2"),
-                        LocalBranchRef::from_str("refs/heads/rebeccat/fix-accept-flag").unwrap(),
-                    ),
-                    is_main: false,
-                    locked: None,
-                    prunable: None,
-                },
-                Worktree {
-                    path: "/Users/wiggles/lix".into(),
-                    head: WorktreeHead::Detached(CommitHash::from(
-                        "0d484aa498b3c839991d11afb31bc5fcf368493d"
-                    )),
-                    is_main: false,
-                    locked: None,
-                    prunable: None,
-                },
-                Worktree {
-                    path: "/path/to/bare-source".into(),
-                    head: WorktreeHead::Bare,
-                    is_main: true,
-                    locked: None,
-                    prunable: None,
-                },
-                Worktree {
-                    path: "/path/to/linked-worktree-locked-no-reason".into(),
-                    head: WorktreeHead::Branch(
-                        CommitHash::from("5678abc5678abc5678abc5678abc5678abc5678c"),
-                        LocalBranchRef::from_str("refs/heads/locked-no-reason").unwrap()
-                    ),
-                    is_main: false,
-                    locked: Some("".into()),
-                    prunable: None,
-                },
-                Worktree {
-                    path: "/path/to/linked-worktree-locked-with-reason".into(),
-                    head: WorktreeHead::Branch(
-                        CommitHash::from("3456def3456def3456def3456def3456def3456b"),
-                        LocalBranchRef::from_str("refs/heads/locked-with-reason").unwrap()
-                    ),
-                    is_main: false,
-                    locked: Some("reason why is locked".into()),
-                    prunable: None,
-                },
-                Worktree {
-                    path: "/path/to/linked-worktree-prunable".into(),
-                    head: WorktreeHead::Detached(CommitHash::from(
-                        "1233def1234def1234def1234def1234def1234b"
-                    ),),
-                    is_main: false,
-                    locked: None,
-                    prunable: Some("gitdir file points to non-existent location".into()),
-                },
+                Worktree::new_branch(
+                    "/Users/wiggles/cabal/accept",
+                    "0685cb3fec8b7144f865638cfd16768e15125fc2",
+                    "rebeccat/fix-accept-flag"
+                ),
+                Worktree::new_detached(
+                    "/Users/wiggles/lix",
+                    "0d484aa498b3c839991d11afb31bc5fcf368493d"
+                ),
+                Worktree::new_bare("/path/to/bare-source"),
+                Worktree::new_branch(
+                    "/path/to/linked-worktree-locked-no-reason",
+                    "5678abc5678abc5678abc5678abc5678abc5678c",
+                    "locked-no-reason"
+                )
+                .with_locked(""),
+                Worktree::new_branch(
+                    "/path/to/linked-worktree-locked-with-reason",
+                    "3456def3456def3456def3456def3456def3456b",
+                    "locked-with-reason"
+                )
+                .with_locked("reason why is locked"),
+                Worktree::new_detached(
+                    "/path/to/linked-worktree-prunable",
+                    "1233def1234def1234def1234def1234def1234b",
+                )
+                .with_prunable("gitdir file points to non-existent location"),
             ]
         );
     }
