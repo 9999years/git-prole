@@ -38,6 +38,8 @@ pub use status::StatusCode;
 pub use status::StatusEntry;
 pub use worktree::AddWorktreeOpts;
 pub use worktree::GitWorktree;
+pub use worktree::RenamedWorktree;
+pub use worktree::ResolveUniqueNameOpts;
 pub use worktree::Worktree;
 pub use worktree::WorktreeHead;
 pub use worktree::Worktrees;
