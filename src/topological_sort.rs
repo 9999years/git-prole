@@ -102,65 +102,83 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pretty_assertions::assert_eq;
+
+    #[track_caller]
+    fn test_topological_sort(input: &[&str], expect: &[&str]) {
+        let input = input.iter().map(Utf8Path::new).collect::<Vec<_>>();
+        let expect = expect.iter().map(Utf8Path::new).collect::<Vec<_>>();
+        assert_eq!(topological_sort(&input).unwrap(), expect);
+    }
 
     #[test]
     fn test_topological_sort_empty() {
-        assert_eq!(
-            topological_sort(&Vec::<&Utf8Path>::new()).unwrap(),
-            Vec::<Utf8PathBuf>::new()
-        );
+        test_topological_sort(&[], &[]);
     }
 
     #[test]
     fn test_topological_sort_unrelated() {
-        assert_eq!(
-            topological_sort(&[
-                Utf8Path::new("/puppy"),
-                Utf8Path::new("/doggy"),
-                Utf8Path::new("/softie"),
-                Utf8Path::new("/cutie"),
-            ])
-            .unwrap(),
-            vec![
-                // TODO: This probably depends on the hash function. >:(
-                Utf8PathBuf::from("/cutie"),
-                Utf8PathBuf::from("/softie"),
-                Utf8PathBuf::from("/doggy"),
-                Utf8PathBuf::from("/puppy"),
-            ]
+        test_topological_sort(
+            &["/puppy", "/doggy", "/softie", "/cutie"],
+            &["/cutie", "/softie", "/doggy", "/puppy"],
         );
     }
 
     #[test]
     fn test_topological_sort_mixed() {
-        assert_eq!(
-            topological_sort(&[
-                Utf8Path::new("/puppy"),
-                Utf8Path::new("/puppy/doggy/cutie"),
-                Utf8Path::new("/puppy/softie"),
-                Utf8Path::new("/puppy/doggy"),
-                Utf8Path::new("/silly"),
-                Utf8Path::new("/silly/goofy"),
-            ])
-            .unwrap(),
-            vec![
-                // TODO: This probably depends on the hash function. >:(
-                Utf8PathBuf::from("/silly/goofy"),
-                Utf8PathBuf::from("/silly"),
-                Utf8PathBuf::from("/puppy/softie"),
-                Utf8PathBuf::from("/puppy/doggy/cutie"),
-                Utf8PathBuf::from("/puppy/doggy"),
-                Utf8PathBuf::from("/puppy"),
-            ]
+        test_topological_sort(
+            &[
+                "/puppy",
+                "/puppy/doggy/cutie",
+                "/puppy/softie",
+                "/puppy/doggy",
+                "/silly",
+                "/silly/goofy",
+            ],
+            &[
+                "/silly/goofy",
+                "/silly",
+                "/puppy/softie",
+                "/puppy/doggy/cutie",
+                "/puppy/doggy",
+                "/puppy",
+            ],
         );
     }
 
     #[test]
     fn test_topological_sort_duplicate() {
         // This also warns the user.
-        assert_eq!(
-            topological_sort(&[Utf8Path::new("/puppy"), Utf8Path::new("/puppy")]).unwrap(),
-            vec![Utf8PathBuf::from("/puppy"), Utf8PathBuf::from("/puppy")]
+        test_topological_sort(&["/puppy", "/puppy"], &["/puppy", "/puppy"]);
+    }
+
+    #[test]
+    fn test_topological_sort_deterministic() {
+        test_topological_sort(
+            &[
+                "/puppy",
+                "/silly/puppy",
+                "/my-repo",
+                "/silly/my-repo",
+                "/puppy.git",
+                "/a",
+                "/b",
+                "/c",
+                "/d/c",
+                "/e/c",
+            ],
+            &[
+                "/e/c",
+                "/d/c",
+                "/c",
+                "/b",
+                "/a",
+                "/puppy.git",
+                "/silly/my-repo",
+                "/my-repo",
+                "/silly/puppy",
+                "/puppy",
+            ],
         );
     }
 }
