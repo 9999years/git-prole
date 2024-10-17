@@ -1,3 +1,4 @@
+use std::ffi::OsStr;
 use std::fmt::Debug;
 use std::process::Command;
 
@@ -151,10 +152,14 @@ impl<'a> GitWorktree<'a> {
     }
 
     #[instrument(level = "trace")]
-    pub fn repair(&self) -> miette::Result<()> {
+    pub fn repair(
+        &self,
+        paths: impl IntoIterator<Item = impl AsRef<OsStr>> + Debug,
+    ) -> miette::Result<()> {
         self.0
             .command()
             .args(["worktree", "repair"])
+            .args(paths)
             .status_checked()
             .into_diagnostic()?;
         Ok(())
