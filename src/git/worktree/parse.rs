@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::fmt::Display;
 use std::ops::Deref;
 use std::str::FromStr;
@@ -8,6 +7,7 @@ use camino::Utf8PathBuf;
 use miette::miette;
 use owo_colors::OwoColorize;
 use owo_colors::Stream;
+use rustc_hash::FxHashMap as HashMap;
 use winnow::combinator::alt;
 use winnow::combinator::cut_err;
 use winnow::combinator::eof;

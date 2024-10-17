@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::fmt::Display;
 use std::str::FromStr;
 
@@ -18,6 +17,7 @@ use git_prole::WorktreeHead;
 use itertools::Itertools;
 use pretty_assertions::assert_eq;
 use pretty_assertions::Comparison;
+use rustc_hash::FxHashMap as HashMap;
 
 /// A repository state, which can be checked against a real repository.
 #[derive(Debug)]
