@@ -1,10 +1,10 @@
-use std::collections::HashSet;
 use std::fmt::Debug;
 use std::ops::Deref;
 use std::ops::DerefMut;
 
 use camino::Utf8PathBuf;
 use miette::miette;
+use rustc_hash::FxHashSet as HashSet;
 use tracing::instrument;
 
 use crate::config::Config;

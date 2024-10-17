@@ -1,9 +1,9 @@
-use std::collections::HashSet;
 use std::fmt::Debug;
 
 use command_error::CommandExt;
 use command_error::OutputContext;
 use miette::IntoDiagnostic;
+use rustc_hash::FxHashSet as HashSet;
 use tracing::instrument;
 use utf8_command::Utf8Output;
 

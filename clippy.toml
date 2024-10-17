@@ -77,3 +77,11 @@ reason = "Use git_prole::fs::copy"
 [[disallowed-methods]]
 path = "std::fs::write"
 reason = "Use git_prole::fs::copy"
+
+[[disallowed-types]]
+path = "std::collections::HashMap"
+reason = "Use rustc_hash::FxHashMap"
+
+[[disallowed-types]]
+path = "std::collections::HashSet"
+reason = "Use rustc_hash::FxHashSet"
