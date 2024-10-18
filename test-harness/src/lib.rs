@@ -4,6 +4,7 @@ use std::process::Command;
 use camino::Utf8PathBuf;
 use clonable_command::Command as ClonableCommand;
 use command_error::CommandExt;
+use expect_test::Expect;
 use git_prole::fs;
 use git_prole::Git;
 use git_prole::Utf8TempDir;
@@ -171,7 +172,20 @@ impl GitProle {
     /// Construct a repository state which a real repository can be checked against.
     ///
     /// The repository state will rooted in the given directory.
+    #[track_caller]
     pub fn repo_state(&self, root: &str) -> RepoState {
         RepoState::new(self.git(root))
+    }
+
+    pub fn contents(&self, path: &str) -> miette::Result<String> {
+        fs::read_to_string(self.path(path))
+    }
+
+    #[track_caller]
+    pub fn assert_contents(&self, contents: &[(&str, Expect)]) {
+        for (path, expect) in contents {
+            let actual = self.contents(path).unwrap();
+            expect.assert_eq(&actual);
+        }
     }
 }
