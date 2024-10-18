@@ -9,7 +9,7 @@ use tempfile::TempDir;
 #[derive(Debug)]
 pub struct Utf8TempDir {
     #[allow(dead_code)]
-    inner: TempDir,
+    inner: Option<TempDir>,
     path: Utf8PathBuf,
 }
 
@@ -17,12 +17,23 @@ impl Utf8TempDir {
     pub fn new() -> miette::Result<Self> {
         let inner = tempfile::tempdir().into_diagnostic()?;
         let path = inner.path().to_owned().try_into().into_diagnostic()?;
-        Ok(Self { inner, path })
+        Ok(Self {
+            inner: Some(inner),
+            path,
+        })
+    }
+
+    /// Keep this directory when it goes out of scope, without changing its type.
+    pub fn persist(&mut self) {
+        let inner = self.inner.take();
+        if let Some(tempdir) = inner {
+            let _ = tempdir.into_path();
+        }
     }
 
     /// Keep this directory when it goes out of scope.
-    pub fn into_path(self) -> Utf8PathBuf {
-        let _ = self.inner.into_path();
+    pub fn into_path(mut self) -> Utf8PathBuf {
+        self.persist();
         self.path
     }
 
