@@ -11,7 +11,6 @@ use rustc_hash::FxHashMap as HashMap;
 use tap::Tap;
 use tracing::instrument;
 use utf8_command::Utf8Output;
-use winnow::Parser;
 
 use super::Git;
 use super::LocalBranchRef;
@@ -58,18 +57,7 @@ impl<'a> GitWorktree<'a> {
     #[instrument(level = "trace")]
     pub fn container(&self) -> miette::Result<Utf8PathBuf> {
         // TODO: Write `.git-prole` to indicate worktree container root?
-        let main = self.main()?;
-        let mut path = if main.head == WorktreeHead::Bare {
-            // Git has a bug(?) where `git worktree list` will show the _parent_ of a
-            // bare worktree in a directory named `.git`. Work around it by getting the
-            // `.git` directory manually.
-            //
-            // See: https://lore.kernel.org/git/8f961645-2b70-4d45-a9f9-72e71c07bc11@app.fastmail.com/T/
-            self.0.with_directory(main.path).path().git_common_dir()?
-        } else {
-            main.path
-        };
-
+        let mut path = self.main()?.path;
         if !path.pop() {
             Err(miette!("Main worktree path has no parent: {path}"))
         } else {
@@ -88,7 +76,7 @@ impl<'a> GitWorktree<'a> {
                     Err(context.error())
                 } else {
                     let output = &context.output().stdout;
-                    match Worktrees::parser.parse(output) {
+                    match Worktrees::parse(self.0, output) {
                         Ok(worktrees) => Ok(worktrees),
                         Err(err) => {
                             let err = miette!("{err}");
