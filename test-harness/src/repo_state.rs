@@ -155,7 +155,7 @@ impl WorktreeState {
     ///
     /// This is used if a bare worktree named `.git` is present at the repository root.
     pub fn new_bare() -> Self {
-        Self::new("").bare()
+        Self::new(".git").bare()
     }
 
     /// This worktree is bare.

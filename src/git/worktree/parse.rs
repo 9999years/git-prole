@@ -1,6 +1,5 @@
 use std::fmt::Display;
 use std::ops::Deref;
-use std::str::FromStr;
 
 use camino::Utf8Path;
 use camino::Utf8PathBuf;
@@ -23,6 +22,7 @@ use winnow::Parser;
 
 use crate::parse::till_null;
 use crate::CommitHash;
+use crate::Git;
 use crate::LocalBranchRef;
 use crate::NormalPath;
 use crate::Ref;
@@ -63,7 +63,7 @@ impl Worktrees {
             .find(|worktree| worktree.head.branch() == Some(branch))
     }
 
-    pub fn parser(input: &mut &str) -> PResult<Self> {
+    fn parser(input: &mut &str) -> PResult<Self> {
         let mut main = Worktree::parser.parse_next(input)?;
         main.is_main = true;
         let main_path = main.path.clone();
@@ -78,18 +78,46 @@ impl Worktrees {
 
         inner.insert(main_path.clone(), main);
 
-        Ok(Self {
+        let worktrees = Self {
             main: main_path,
             inner,
-        })
+        };
+
+        tracing::debug!(
+            worktrees=%worktrees,
+            "Parsed worktrees",
+        );
+
+        Ok(worktrees)
     }
-}
 
-impl FromStr for Worktrees {
-    type Err = miette::Report;
+    pub fn parse(git: &Git, input: &str) -> miette::Result<Self> {
+        let mut ret = Self::parser.parse(input).map_err(|err| miette!("{err}"))?;
 
-    fn from_str(input: &str) -> Result<Self, Self::Err> {
-        Self::parser.parse(input).map_err(|err| miette!("{err}"))
+        if ret.main().head.is_bare() {
+            // Git has a bug(?) where `git worktree list` will show the _parent_ of a
+            // bare worktree in a directory named `.git`. Work around it by getting the
+            // `.git` directory manually and patching up the returned value to replace the path of
+            // the main worktree (which is, unfortunately, stored in three separate places).
+            //
+            // It's _possible_ to do this in the parser, but then the parser is no longer a pure
+            // function and the error handling is very annoying.
+            //
+            // See: https://lore.kernel.org/git/8f961645-2b70-4d45-a9f9-72e71c07bc11@app.fastmail.com/T/
+
+            let git_dir = git.path().git_common_dir()?;
+            if git_dir != ret.main {
+                let old_main_path = std::mem::replace(&mut ret.main, git_dir);
+                let mut main = ret
+                    .inner
+                    .remove(&old_main_path)
+                    .expect("There is always a main worktree");
+                main.path = ret.main.clone();
+                ret.inner.insert(ret.main.clone(), main);
+            }
+        }
+
+        Ok(ret)
     }
 }
 
@@ -264,7 +292,7 @@ impl Display for Worktree {
 }
 
 impl Worktree {
-    pub fn parser(input: &mut &str) -> PResult<Self> {
+    fn parser(input: &mut &str) -> PResult<Self> {
         let _ = "worktree ".parse_next(input)?;
         let path = Utf8PathBuf::from(till_null.parse_next(input)?);
         let head = WorktreeHead::parser.parse_next(input)?;
@@ -376,40 +404,41 @@ mod tests {
 
     #[test]
     fn test_parse_worktrees_list() {
-        let worktrees = Worktrees::from_str(
-            &indoc!(
-                "
-                worktree /path/to/bare-source
-                bare
+        let worktrees = Worktrees::parser
+            .parse(
+                &indoc!(
+                    "
+                    worktree /path/to/bare-source
+                    bare
 
-                worktree /Users/wiggles/cabal/accept
-                HEAD 0685cb3fec8b7144f865638cfd16768e15125fc2
-                branch refs/heads/rebeccat/fix-accept-flag
+                    worktree /Users/wiggles/cabal/accept
+                    HEAD 0685cb3fec8b7144f865638cfd16768e15125fc2
+                    branch refs/heads/rebeccat/fix-accept-flag
 
-                worktree /Users/wiggles/lix
-                HEAD 0d484aa498b3c839991d11afb31bc5fcf368493d
-                detached
+                    worktree /Users/wiggles/lix
+                    HEAD 0d484aa498b3c839991d11afb31bc5fcf368493d
+                    detached
 
-                worktree /path/to/linked-worktree-locked-no-reason
-                HEAD 5678abc5678abc5678abc5678abc5678abc5678c
-                branch refs/heads/locked-no-reason
-                locked
+                    worktree /path/to/linked-worktree-locked-no-reason
+                    HEAD 5678abc5678abc5678abc5678abc5678abc5678c
+                    branch refs/heads/locked-no-reason
+                    locked
 
-                worktree /path/to/linked-worktree-locked-with-reason
-                HEAD 3456def3456def3456def3456def3456def3456b
-                branch refs/heads/locked-with-reason
-                locked reason why is locked
+                    worktree /path/to/linked-worktree-locked-with-reason
+                    HEAD 3456def3456def3456def3456def3456def3456b
+                    branch refs/heads/locked-with-reason
+                    locked reason why is locked
 
-                worktree /path/to/linked-worktree-prunable
-                HEAD 1233def1234def1234def1234def1234def1234b
-                detached
-                prunable gitdir file points to non-existent location
+                    worktree /path/to/linked-worktree-prunable
+                    HEAD 1233def1234def1234def1234def1234def1234b
+                    detached
+                    prunable gitdir file points to non-existent location
 
-                "
+                    "
+                )
+                .replace('\n', "\0"),
             )
-            .replace('\n', "\0"),
-        )
-        .unwrap();
+            .unwrap();
 
         assert_eq!(worktrees.main_path(), "/path/to/bare-source");
 
