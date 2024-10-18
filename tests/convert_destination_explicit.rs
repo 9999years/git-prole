@@ -4,31 +4,23 @@ use test_harness::GitProle;
 use test_harness::WorktreeState;
 
 #[test]
-fn convert_multiple_worktrees() -> miette::Result<()> {
+fn convert_destination_explicit() -> miette::Result<()> {
     let prole = GitProle::new()?;
     prole.setup_repo("my-repo")?;
 
-    prole.sh("
-        # Another path here keeps `git-prole` from using the tempdir as the root.
-        mkdir my-other-repo
-        cd my-repo || exit
-        git worktree add ../puppy
-        git worktree add ../doggy
-        ")?;
-
     prole
         .cd_cmd("my-repo")
-        .arg("convert")
+        .args(["convert", "../puppy"])
         .status_checked()
         .into_diagnostic()?;
 
+    prole.sh("ls -la && ls -la puppy")?;
+
     prole
-        .repo_state("my-repo")
+        .repo_state("puppy")
         .worktrees([
             WorktreeState::new_bare(),
             WorktreeState::new("main").branch("main"),
-            WorktreeState::new("puppy").branch("puppy"),
-            WorktreeState::new("doggy").branch("doggy"),
         ])
         .assert();
 

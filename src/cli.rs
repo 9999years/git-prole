@@ -88,6 +88,10 @@ pub struct ConvertArgs {
     /// A default branch to create a worktree for.
     #[arg(long)]
     pub default_branch: Option<String>,
+
+    /// The directory to place the worktrees into.
+    #[arg()]
+    pub destination: Option<Utf8PathBuf>,
 }
 
 #[derive(Args, Clone, Debug)]
