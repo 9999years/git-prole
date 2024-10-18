@@ -82,6 +82,7 @@ impl RepoState {
                         self.root
                             .join(&worktree.path)
                             .canonicalize_utf8()
+                            .map_err(|err| format!("{err}: {}", worktree.path))
                             .expect("Worktree path should be canonicalize-able"),
                         worktree,
                     )
