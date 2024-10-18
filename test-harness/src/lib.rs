@@ -45,9 +45,17 @@ impl GitProle {
 
         let git_prole = test_bin::get_test_bin("git-prole").get_program().to_owned();
 
-        let log_filters = ["debug", "git_prole=debug", "git_prole::git=trace"]
+        let log_filters = match std::env::var("GIT_PROLE_LOG") {
+            Ok(log_filters) => log_filters,
+            _ => [
+                "debug",
+                "git_prole=debug",
+                "git_prole::git=trace",
+                "git_prole::fs=trace",
+            ]
             .into_iter()
-            .join(",");
+            .join(","),
+        };
 
         let git_prole_args = vec!["--log".to_owned(), log_filters];
 
