@@ -2,6 +2,7 @@ use std::fmt::Debug;
 
 use command_error::CommandExt;
 use command_error::OutputContext;
+use miette::miette;
 use miette::IntoDiagnostic;
 use tracing::instrument;
 use utf8_command::Utf8Output;
@@ -23,9 +24,12 @@ impl<'a> GitConfig<'a> {
         Self(git)
     }
 
-    /// Get a config setting by name.
-    #[instrument(level = "trace")]
-    pub fn get(&self, key: &str) -> miette::Result<Option<String>> {
+    /// Get a config setting by name and parse a value out of it.
+    pub fn get_and<R>(
+        &self,
+        key: &str,
+        parser: impl Fn(OutputContext<Utf8Output>, Option<String>) -> Result<R, command_error::Error>,
+    ) -> miette::Result<R> {
         self.0
             .command()
             .args(["config", "get", "--null", key])
@@ -41,17 +45,44 @@ impl<'a> GitConfig<'a> {
                                     "Trailing data in `git config` output"
                                 );
                             }
-                            Ok(Some(value.to_owned()))
+                            let value = value.to_owned();
+                            parser(context, Some(value))
                         }
                         None => Err(context.error_msg("Output didn't contain any null bytes")),
                     }
                 } else if let Some(1) = context.status().code() {
-                    Ok(None)
+                    parser(context, None)
                 } else {
                     Err(context.error())
                 }
             })
             .into_diagnostic()
+    }
+
+    /// Get a config setting by name.
+    #[instrument(level = "trace")]
+    pub fn get(&self, key: &str) -> miette::Result<Option<String>> {
+        self.get_and(key, |_, value| Ok(value))
+    }
+
+    /// Check if this repository is bare.
+    #[instrument(level = "trace")]
+    pub fn is_bare(&self) -> miette::Result<bool> {
+        self.get_and("core.bare", |context, value| {
+            match value {
+                None => {
+                    // This seems to not happen in practice, but whatever.
+                    Ok(false)
+                }
+                Some(value) => match value.as_str() {
+                    "true" => Ok(true),
+                    "false" => Ok(false),
+                    _ => Err(context.error_msg(miette!(
+                        "Unexpected Git config value for `core.bare`: {value}"
+                    ))),
+                },
+            }
+        })
     }
 
     /// Set a local config setting.
