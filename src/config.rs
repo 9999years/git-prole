@@ -1,8 +1,12 @@
+use std::process::Command;
+
 use camino::Utf8PathBuf;
 use clap::Parser;
 use miette::Context;
 use miette::IntoDiagnostic;
+use serde::de::Error;
 use serde::Deserialize;
+use unindent::unindent;
 use xdg::BaseDirectories;
 
 use crate::cli::Cli;
@@ -78,6 +82,9 @@ pub struct ConfigFile {
 
     #[serde(default)]
     enable_gh: Option<bool>,
+
+    #[serde(default)]
+    commands: Vec<ShellCommand>,
 }
 
 impl ConfigFile {
@@ -106,6 +113,65 @@ impl ConfigFile {
     pub fn enable_gh(&self) -> bool {
         self.enable_gh.unwrap_or(false)
     }
+
+    pub fn commands(&self) -> Vec<ShellCommand> {
+        self.commands.clone()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[serde(untagged)]
+pub enum ShellCommand {
+    Simple(ShellArgs),
+    Shell { sh: String },
+}
+
+impl ShellCommand {
+    pub fn as_command(&self) -> Command {
+        match self {
+            ShellCommand::Simple(args) => {
+                let mut command = Command::new(&args.program);
+                command.args(&args.args);
+                command
+            }
+            ShellCommand::Shell { sh } => {
+                let mut command = Command::new("sh");
+                let sh = unindent(sh);
+                command.args(["-c", sh.trim_ascii()]);
+                command
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ShellArgs {
+    program: String,
+    args: Vec<String>,
+}
+
+impl<'de> Deserialize<'de> for ShellArgs {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let quoted: String = Deserialize::deserialize(deserializer)?;
+        let mut args = shell_words::split(&quoted).map_err(D::Error::custom)?;
+
+        if args.is_empty() {
+            return Err(D::Error::invalid_value(
+                serde::de::Unexpected::Str(&quoted),
+                // TODO: This error message doesn't actually get propagated upward
+                // correctly, so you get "data did not match any variant of untagged enum
+                // ShellCommand" instead.
+                &"a shell command (you are missing a program)",
+            ));
+        }
+
+        let program = args.remove(0);
+
+        Ok(Self { program, args })
+    }
 }
 
 #[cfg(test)]
@@ -122,6 +188,7 @@ mod tests {
                 default_branches: vec!["main".to_owned(), "master".to_owned(), "trunk".to_owned(),],
                 copy_untracked: Some(true),
                 enable_gh: Some(false),
+                commands: vec![],
             }
         );
     }

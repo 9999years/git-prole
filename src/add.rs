@@ -170,11 +170,37 @@ impl<'a> WorktreePlan<'a> {
         tracing::debug!("{self:#?}");
 
         if self.git.config.cli.dry_run {
-            tracing::info!("$ {}", Utf8ProgramAndArgs::from(&command));
+            tracing::info!(
+                "{} {}",
+                '$'.if_supports_color(Stream::Stdout, |text| text.green()),
+                Utf8ProgramAndArgs::from(&command)
+            );
         } else {
             command.status_checked()?;
             self.copy_untracked()?;
         }
+        self.run_commands()?;
+        Ok(())
+    }
+
+    #[instrument(level = "trace")]
+    fn run_commands(&self) -> miette::Result<()> {
+        for command in self.git.config.file.commands() {
+            let mut command = command.as_command();
+            let command_display = Utf8ProgramAndArgs::from(&command);
+            tracing::info!(
+                "{} {command_display}",
+                '$'.if_supports_color(Stream::Stdout, |text| text.green())
+            );
+            let status = command
+                .current_dir(&self.destination)
+                .status_checked()
+                .into_diagnostic();
+            if let Err(err) = status {
+                tracing::error!("{err}");
+            }
+        }
+
         Ok(())
     }
 }
