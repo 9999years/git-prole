@@ -2,11 +2,8 @@ use std::fmt::Debug;
 
 use camino::Utf8PathBuf;
 use command_error::CommandExt;
-use command_error::OutputContext;
 use miette::miette;
-use miette::Context;
 use tracing::instrument;
-use utf8_command::Utf8Output;
 
 use crate::PathDisplay;
 
@@ -31,8 +28,8 @@ impl<'a> GitPath<'a> {
     /// repository is bare, get the `.git` directory (`git rev-parse --git-dir`). Otherwise, error.
     #[instrument(level = "trace")]
     pub fn repo_root_or_git_common_dir_if_bare(&self) -> miette::Result<Utf8PathBuf> {
-        if self.is_inside_work_tree()? {
-            self.repo_root()
+        if self.0.worktree().is_inside()? {
+            self.0.worktree().root()
         } else if self.0.config().is_bare()? {
             self.git_common_dir()
         } else {
@@ -41,41 +38,6 @@ impl<'a> GitPath<'a> {
                 self.0.get_directory().display_path_cwd()
             ))
         }
-    }
-
-    /// Check if we're inside a working tree.
-    #[instrument(level = "trace")]
-    pub fn is_inside_work_tree(&self) -> miette::Result<bool> {
-        Ok(self
-            .0
-            .rev_parse_command()
-            .arg("--is-inside-work-tree")
-            .output_checked_as(|context: OutputContext<Utf8Output>| {
-                if !context.status().success() {
-                    Err(context.error())
-                } else {
-                    let stdout = context.output().stdout.trim();
-                    match stdout {
-                        "true" => Ok(true),
-                        "false" => Ok(false),
-                        _ => Err(context.error_msg("Expected 'true' or 'false'")),
-                    }
-                }
-            })?)
-    }
-
-    /// `git rev-parse --show-toplevel`
-    #[instrument(level = "trace")]
-    pub fn repo_root(&self) -> miette::Result<Utf8PathBuf> {
-        Ok(self
-            .0
-            .rev_parse_command()
-            .arg("--show-toplevel")
-            .output_checked_utf8()
-            .wrap_err("Failed to get working directory of repository")?
-            .stdout
-            .trim()
-            .into())
     }
 
     /// Get the `.git` directory path.

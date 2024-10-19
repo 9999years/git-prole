@@ -200,6 +200,11 @@ impl<'a> ConvertPlan<'a> {
         //   - Otherwise just use the git dir path.
 
         let tempdir = Utf8TempDir::new()?.into_path();
+        // Tests:
+        // - `convert_from_bare`
+        // - `convert_bare_dot_git`
+        // - `convert_bare_dot_git_from_parent`
+        // - `convert_common_parent`
         let repo = git.path().repo_root_or_git_common_dir_if_bare()?;
         let repo = repo
             .parent()
@@ -221,7 +226,9 @@ impl<'a> ConvertPlan<'a> {
                 .rev_parse_symbolic_full_name(&default_branch)?
                 .ok_or_else(|| miette!("`--default-branch` not found: {default_branch}"))?
                 .try_into()?,
-            None => git.preferred_branch()?,
+            None => git.preferred_branch()?.ok_or_else(|| {
+                miette!("No default branch found; specify a `--default-branch` to check out")
+            })?,
         };
         tracing::debug!(%default_branch, "Default branch determined");
 

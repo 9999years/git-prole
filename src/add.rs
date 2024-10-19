@@ -12,6 +12,7 @@ use miette::IntoDiagnostic;
 use owo_colors::OwoColorize;
 use owo_colors::Stream;
 use tap::Tap;
+use tracing::instrument;
 
 use crate::app_git::AppGit;
 use crate::cli::AddArgs;
@@ -27,8 +28,6 @@ use crate::Utf8Absolutize;
 #[derive(Debug, Clone)]
 pub struct WorktreePlan<'a> {
     git: AppGit<'a>,
-    /// The directory to run commands from.
-    worktree: Utf8PathBuf,
     destination: Utf8PathBuf,
     branch: BranchStartPointPlan,
     /// Relative paths to copy to the new worktree, if any.
@@ -36,27 +35,40 @@ pub struct WorktreePlan<'a> {
 }
 
 impl<'a> WorktreePlan<'a> {
+    #[instrument(level = "trace")]
     pub fn new(git: AppGit<'a>, args: &'a AddArgs) -> miette::Result<Self> {
         // TODO: Check if there's more than 1 worktree and (offer to?) convert if not?
         // TODO: Allow user to run commands, e.g. `direnv allow`?
 
-        let worktree = git.path().repo_root()?;
+        // Tests:
+        // - `add_by_path`
+        // - `add_from_container`
+        // - `add_from_bare_no_worktrees`
+        // - `add_from_container_no_default_branch`
+        let worktree = git.some_worktree()?;
+
+        let git = git.with_directory(worktree);
         let branch = BranchStartPointPlan::new(&git, args)?;
         let destination = Self::destination_plan(&git, args, branch.local_branch())?;
-        let copy_untracked = if git.config.file.copy_untracked() {
-            git.status().untracked_files()?
-        } else {
-            Vec::new()
-        };
+        let copy_untracked = Self::untracked_plan(&git)?;
         Ok(Self {
             git,
-            worktree,
             branch,
             destination,
             copy_untracked,
         })
     }
 
+    #[instrument(level = "trace")]
+    fn untracked_plan(git: &AppGit<'_>) -> miette::Result<Vec<Utf8PathBuf>> {
+        if git.config.file.copy_untracked() && git.worktree().is_inside()? {
+            git.status().untracked_files()
+        } else {
+            Ok(Vec::new())
+        }
+    }
+
+    #[instrument(level = "trace")]
     fn destination_plan(
         git: &AppGit<'_>,
         args: &AddArgs,
@@ -102,26 +114,25 @@ impl<'a> WorktreePlan<'a> {
             }
         };
 
-        git.with_directory(self.worktree.clone())
-            .worktree()
-            .add_command(
-                &self.destination,
-                &AddWorktreeOpts {
-                    force_branch,
-                    create_branch,
-                    track,
-                    start_point: Some(match &self.branch {
-                        BranchStartPointPlan::Existing(branch) => branch.branch_name(),
-                        BranchStartPointPlan::New { start, .. } => match start {
-                            StartPoint::Branch(start) => start.qualified_branch_name(),
-                            StartPoint::Commitish(commitish) => commitish,
-                        },
-                    }),
-                    ..Default::default()
-                },
-            )
+        git.worktree().add_command(
+            &self.destination,
+            &AddWorktreeOpts {
+                force_branch,
+                create_branch,
+                track,
+                start_point: Some(match &self.branch {
+                    BranchStartPointPlan::Existing(branch) => branch.branch_name(),
+                    BranchStartPointPlan::New { start, .. } => match start {
+                        StartPoint::Branch(start) => start.qualified_branch_name(),
+                        StartPoint::Commitish(commitish) => commitish,
+                    },
+                }),
+                ..Default::default()
+            },
+        )
     }
 
+    #[instrument(level = "trace")]
     fn copy_untracked(&self) -> miette::Result<()> {
         if self.copy_untracked.is_empty() {
             return Ok(());
@@ -131,7 +142,7 @@ impl<'a> WorktreePlan<'a> {
             self.destination.display_path_cwd()
         );
         for path in &self.copy_untracked {
-            let from = self.worktree.join(path);
+            let from = self.git.get_directory().join(path);
             let to = self.destination.join(path);
             tracing::trace!(
                 %path,
@@ -151,6 +162,7 @@ impl<'a> WorktreePlan<'a> {
         Ok(())
     }
 
+    #[instrument(level = "trace")]
     pub fn execute(&self) -> miette::Result<()> {
         let mut command = self.command(&self.git);
 
@@ -209,7 +221,9 @@ impl StartPoint {
     }
 
     pub fn preferred(git: &AppGit) -> miette::Result<Self> {
-        Ok(Self::Branch(git.preferred_branch()?))
+        Ok(Self::Branch(git.preferred_branch()?.ok_or_else(|| {
+            miette!("No default branch found; pass a COMMITISH to start the new worktree at")
+        })?))
     }
 }
 
