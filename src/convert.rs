@@ -266,7 +266,7 @@ impl<'a> ConvertPlan<'a> {
         // Note: It's hard to write behavior tests for this because the tempdirs that tests run in
         // are randomly generated, so even though `rustc_hash` makes the `HashMap` iteration order
         // deterministic, the hashes of worktree paths aren't deterministic because they include
-        // the tempdir paths.
+        // the tempdir paths. There's tests in `./git/worktree/resolve_unique_names.rs` though.
         let mut worktrees = git.worktree().resolve_unique_names(ResolveUniqueNameOpts {
             worktrees,
             names: new_worktrees
