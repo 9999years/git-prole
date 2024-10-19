@@ -160,7 +160,7 @@ impl<'a> WorktreePlan<'a> {
         if self.git.config.cli.dry_run {
             tracing::info!("$ {}", Utf8ProgramAndArgs::from(&command));
         } else {
-            command.status_checked().into_diagnostic()?;
+            command.status_checked()?;
             self.copy_untracked()?;
         }
         Ok(())

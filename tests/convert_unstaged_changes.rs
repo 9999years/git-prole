@@ -1,6 +1,5 @@
 use command_error::CommandExt;
 use expect_test::expect;
-use miette::IntoDiagnostic;
 use test_harness::GitProle;
 use test_harness::WorktreeState;
 
@@ -22,11 +21,7 @@ fn convert_unstaged_changes() -> miette::Result<()> {
             .status([" M README.md"])])
         .assert();
 
-    prole
-        .cd_cmd("my-repo")
-        .arg("convert")
-        .status_checked()
-        .into_diagnostic()?;
+    prole.cd_cmd("my-repo").arg("convert").status_checked()?;
 
     prole
         .repo_state("my-repo")

@@ -1,5 +1,4 @@
 use command_error::CommandExt;
-use miette::IntoDiagnostic;
 use test_harness::GitProle;
 use test_harness::WorktreeState;
 
@@ -27,8 +26,7 @@ fn convert_no_op() -> miette::Result<()> {
     let output = prole
         .cd_cmd("my-repo")
         .arg("convert")
-        .output_checked_utf8()
-        .into_diagnostic()?;
+        .output_checked_utf8()?;
 
     assert!(
         output.stderr.contains("is already a worktree repository"),

@@ -5,7 +5,6 @@ use command_error::CommandExt;
 use command_error::OutputContext;
 use miette::miette;
 use miette::Context;
-use miette::IntoDiagnostic;
 use tap::Tap;
 use tracing::instrument;
 use utf8_command::Utf8Output;
@@ -47,7 +46,6 @@ impl<'a> GitRefs<'a> {
             .command()
             .args(["show", "--no-patch", "--format=%B", commit])
             .output_checked_utf8()
-            .into_diagnostic()
             .wrap_err("Failed to get commit message")?
             .stdout)
     }
@@ -61,7 +59,8 @@ impl<'a> GitRefs<'a> {
     /// Parse a `commitish` into a commit hash.
     #[instrument(level = "trace")]
     pub fn parse(&self, commitish: &str) -> miette::Result<Option<CommitHash>> {
-        self.0
+        Ok(self
+            .0
             .rev_parse_command()
             .args(["--verify", "--quiet", "--end-of-options", commitish])
             .output_checked_as(|context: OutputContext<Utf8Output>| {
@@ -72,14 +71,14 @@ impl<'a> GitRefs<'a> {
                 } else {
                     Ok(None)
                 }
-            })
-            .into_diagnostic()
+            })?)
     }
 
     /// `git rev-parse --symbolic-full-name`
     #[instrument(level = "trace")]
     pub fn rev_parse_symbolic_full_name(&self, commitish: &str) -> miette::Result<Option<Ref>> {
-        self.0
+        Ok(self
+            .0
             .rev_parse_command()
             .args([
                 "--symbolic-full-name",
@@ -109,8 +108,7 @@ impl<'a> GitRefs<'a> {
                 } else {
                     Ok(None)
                 }
-            })
-            .into_diagnostic()
+            })?)
     }
 
     /// Determine if a given `<commit-ish>` refers to a commit or a symbolic ref name.
@@ -132,8 +130,7 @@ impl<'a> GitRefs<'a> {
             .0
             .command()
             .args(["symbolic-ref", "--quiet", "HEAD"])
-            .output_checked_with_utf8::<String>(|_output| Ok(()))
-            .into_diagnostic()?;
+            .output_checked_with_utf8::<String>(|_output| Ok(()))?;
 
         Ok(!output.status.success())
     }
@@ -162,8 +159,7 @@ impl<'a> GitRefs<'a> {
             .tap_mut(|c| {
                 globs.map(|globs| c.args(globs));
             })
-            .output_checked_utf8()
-            .into_diagnostic()?
+            .output_checked_utf8()?
             .stdout
             .lines()
             .map(Ref::from_str)

@@ -1,6 +1,5 @@
 use command_error::CommandExt;
 use expect_test::expect;
-use miette::IntoDiagnostic;
 use test_harness::setup_repo_multiple_remotes;
 use test_harness::GitProle;
 use test_harness::WorktreeState;
@@ -19,11 +18,7 @@ fn config_remotes_default() -> miette::Result<()> {
     //
     // The default config says `upstream` is more important than `origin`, so we use that!
 
-    prole
-        .cd_cmd("my-repo")
-        .arg("convert")
-        .status_checked()
-        .into_diagnostic()?;
+    prole.cd_cmd("my-repo").arg("convert").status_checked()?;
 
     prole
         .repo_state("my-repo")

@@ -122,8 +122,7 @@ impl GitProle {
         self.any_command("bash")
             .arg("--norc")
             .arg(tempfile.as_ref())
-            .status_checked()
-            .into_diagnostic()?;
+            .status_checked()?;
         Ok(())
     }
 
@@ -168,7 +167,6 @@ impl GitProle {
             .current_dir(self.path(path))
             .arg("convert")
             .output_checked_utf8()
-            .into_diagnostic()
             .wrap_err_with(|| format!("Failed to convert {path} to a worktree checkout"))?;
 
         Ok(())

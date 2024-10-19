@@ -1,5 +1,4 @@
 use command_error::CommandExt;
-use miette::IntoDiagnostic;
 use test_harness::GitProle;
 use test_harness::WorktreeState;
 
@@ -21,11 +20,7 @@ fn convert_bare_no_dot() -> miette::Result<()> {
         git worktree add --detach ../doggy
         "#)?;
 
-    prole
-        .cd_cmd("main")
-        .arg("convert")
-        .status_checked()
-        .into_diagnostic()?;
+    prole.cd_cmd("main").arg("convert").status_checked()?;
 
     prole
         .repo_state("my-repo")

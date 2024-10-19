@@ -5,7 +5,6 @@ use command_error::CommandExt;
 use command_error::OutputContext;
 use miette::miette;
 use miette::Context;
-use miette::IntoDiagnostic;
 use tap::TryConv;
 use tracing::instrument;
 use utf8_command::Utf8Output;
@@ -42,7 +41,6 @@ impl<'a> GitRemote<'a> {
             .command()
             .arg("remote")
             .output_checked_utf8()
-            .into_diagnostic()
             .wrap_err("Failed to list Git remotes")?
             .stdout
             .lines()
@@ -58,7 +56,6 @@ impl<'a> GitRemote<'a> {
             .command()
             .args(["remote", "get-url", "--push", remote])
             .output_checked_utf8()
-            .into_diagnostic()
             .wrap_err("Failed to get Git remote URL")?
             .stdout
             .trim()
@@ -67,7 +64,8 @@ impl<'a> GitRemote<'a> {
 
     #[instrument(level = "trace")]
     fn default_branch_symbolic_ref(&self, remote: &str) -> miette::Result<RemoteBranchRef> {
-        self.0
+        Ok(self
+            .0
             .command()
             .args(["symbolic-ref", &format!("refs/remotes/{remote}/HEAD")])
             .output_checked_as(|context: OutputContext<Utf8Output>| {
@@ -83,8 +81,7 @@ impl<'a> GitRemote<'a> {
                         },
                     }
                 }
-            })
-            .into_diagnostic()
+            })?)
     }
 
     #[instrument(level = "trace")]
@@ -109,8 +106,7 @@ impl<'a> GitRemote<'a> {
                         },
                     }
                 }
-            })
-            .into_diagnostic()?;
+            })?;
 
         // To avoid talking to the remote next time, write a symbolic-ref.
         self.0
@@ -121,7 +117,6 @@ impl<'a> GitRemote<'a> {
                 &format!("refs/remotes/{remote}/{branch}"),
             ])
             .output_checked_utf8()
-            .into_diagnostic()
             .wrap_err_with(|| {
                 format!("Failed to store symbolic ref for default branch for remote {remote}")
             })?;
@@ -190,7 +185,7 @@ impl<'a> GitRemote<'a> {
         if let Some(refspec) = refspec {
             command.arg(refspec);
         }
-        command.status_checked().into_diagnostic()?;
+        command.status_checked()?;
         Ok(())
     }
 }

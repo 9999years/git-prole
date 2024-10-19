@@ -2,7 +2,6 @@ use std::fmt::Debug;
 
 use command_error::CommandExt;
 use command_error::OutputContext;
-use miette::IntoDiagnostic;
 use rustc_hash::FxHashSet as HashSet;
 use tracing::instrument;
 use utf8_command::Utf8Output;
@@ -51,13 +50,13 @@ impl<'a> GitBranch<'a> {
     /// Does a local branch exist?
     #[instrument(level = "trace")]
     pub fn exists_local(&self, branch: &str) -> miette::Result<bool> {
-        self.0
+        Ok(self
+            .0
             .command()
             .args(["show-ref", "--quiet", "--branches", branch])
             .output_checked_as(|context: OutputContext<Utf8Output>| {
                 Ok::<_, command_error::Error>(context.status().success())
-            })
-            .into_diagnostic()
+            })?)
     }
 
     /// Does the given branch name exist as a local branch, a unique remote branch, or neither?

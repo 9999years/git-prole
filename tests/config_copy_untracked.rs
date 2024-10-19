@@ -1,6 +1,5 @@
 use command_error::CommandExt;
 use expect_test::expect;
-use miette::IntoDiagnostic;
 use test_harness::GitProle;
 use test_harness::WorktreeState;
 
@@ -24,8 +23,7 @@ fn config_copy_untracked() -> miette::Result<()> {
     prole
         .cd_cmd("my-repo/main")
         .args(["add", "puppy"])
-        .status_checked()
-        .into_diagnostic()?;
+        .status_checked()?;
 
     prole
         .repo_state("my-repo")

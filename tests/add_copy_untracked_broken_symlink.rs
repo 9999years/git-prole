@@ -1,5 +1,4 @@
 use command_error::CommandExt;
-use miette::IntoDiagnostic;
 use test_harness::GitProle;
 use test_harness::WorktreeState;
 
@@ -20,8 +19,7 @@ fn add_copy_untracked_broken_symlink() -> miette::Result<()> {
     prole
         .cd_cmd("my-repo/main")
         .args(["add", "puppy"])
-        .status_checked()
-        .into_diagnostic()?;
+        .status_checked()?;
 
     prole
         .repo_state("my-repo")

@@ -1,5 +1,4 @@
 use command_error::CommandExt;
-use miette::IntoDiagnostic;
 use test_harness::GitProle;
 use test_harness::WorktreeState;
 
@@ -24,8 +23,7 @@ fn convert_bare_ends_with_dot_git() -> miette::Result<()> {
     prole
         .cd_cmd("my-repo.git")
         .arg("convert")
-        .status_checked()
-        .into_diagnostic()?;
+        .status_checked()?;
 
     prole
         .repo_state("my-repo")

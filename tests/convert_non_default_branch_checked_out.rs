@@ -1,6 +1,5 @@
 use command_error::CommandExt;
 use expect_test::expect;
-use miette::IntoDiagnostic;
 use test_harness::GitProle;
 use test_harness::WorktreeState;
 
@@ -16,11 +15,7 @@ fn convert_non_default_branch_checked_out() -> miette::Result<()> {
         git commit -am 'cooler readme'
         ")?;
 
-    prole
-        .cd_cmd("my-repo")
-        .arg("convert")
-        .status_checked()
-        .into_diagnostic()?;
+    prole.cd_cmd("my-repo").arg("convert").status_checked()?;
 
     prole
         .repo_state("my-repo")

@@ -3,7 +3,6 @@ use std::fmt::Debug;
 use command_error::CommandExt;
 use command_error::OutputContext;
 use miette::miette;
-use miette::IntoDiagnostic;
 use tracing::instrument;
 use utf8_command::Utf8Output;
 
@@ -30,7 +29,8 @@ impl<'a> GitConfig<'a> {
         key: &str,
         parser: impl Fn(OutputContext<Utf8Output>, Option<String>) -> Result<R, command_error::Error>,
     ) -> miette::Result<R> {
-        self.0
+        Ok(self
+            .0
             .command()
             .args(["config", "get", "--null", key])
             .output_checked_as(|context: OutputContext<Utf8Output>| {
@@ -55,8 +55,7 @@ impl<'a> GitConfig<'a> {
                 } else {
                     Err(context.error())
                 }
-            })
-            .into_diagnostic()
+            })?)
     }
 
     /// Get a config setting by name.
@@ -91,8 +90,7 @@ impl<'a> GitConfig<'a> {
         self.0
             .command()
             .args(["config", "set", key, value])
-            .output_checked_utf8()
-            .into_diagnostic()?;
+            .output_checked_utf8()?;
         Ok(())
     }
 }

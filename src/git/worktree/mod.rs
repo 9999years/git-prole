@@ -7,7 +7,6 @@ use camino::Utf8PathBuf;
 use command_error::CommandExt;
 use command_error::OutputContext;
 use miette::miette;
-use miette::IntoDiagnostic;
 use rustc_hash::FxHashMap as HashMap;
 use tap::Tap;
 use tracing::instrument;
@@ -69,7 +68,8 @@ impl<'a> GitWorktree<'a> {
     /// List Git worktrees.
     #[instrument(level = "trace")]
     pub fn list(&self) -> miette::Result<Worktrees> {
-        self.0
+        Ok(self
+            .0
             .command()
             .args(["worktree", "list", "--porcelain", "-z"])
             .output_checked_as(|context: OutputContext<Utf8Output>| {
@@ -85,15 +85,12 @@ impl<'a> GitWorktree<'a> {
                         }
                     }
                 }
-            })
-            .into_diagnostic()
+            })?)
     }
 
     #[instrument(level = "trace")]
     pub fn add(&self, path: &Utf8Path, options: &AddWorktreeOpts<'_>) -> miette::Result<()> {
-        self.add_command(path, options)
-            .status_checked()
-            .into_diagnostic()?;
+        self.add_command(path, options).status_checked()?;
         Ok(())
     }
 
@@ -134,8 +131,7 @@ impl<'a> GitWorktree<'a> {
             .command()
             .current_dir(from)
             .args(["worktree", "move", from.as_str(), to.as_str()])
-            .status_checked()
-            .into_diagnostic()?;
+            .status_checked()?;
         Ok(())
     }
 
@@ -148,8 +144,7 @@ impl<'a> GitWorktree<'a> {
             .command()
             .args(["worktree", "repair"])
             .args(paths)
-            .output_checked_utf8()
-            .into_diagnostic()?;
+            .output_checked_utf8()?;
         Ok(())
     }
 

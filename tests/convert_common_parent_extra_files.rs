@@ -1,5 +1,4 @@
 use command_error::CommandExt;
-use miette::IntoDiagnostic;
 use test_harness::GitProle;
 use test_harness::WorktreeState;
 
@@ -21,8 +20,7 @@ fn convert_common_parent_extra_files() -> miette::Result<()> {
     prole
         .cd_cmd("my-prefix/my-repo")
         .arg("convert")
-        .status_checked()
-        .into_diagnostic()?;
+        .status_checked()?;
 
     prole
         .repo_state("my-prefix/my-repo")
