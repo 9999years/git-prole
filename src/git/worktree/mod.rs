@@ -7,6 +7,7 @@ use camino::Utf8PathBuf;
 use command_error::CommandExt;
 use command_error::OutputContext;
 use miette::miette;
+use miette::Context;
 use rustc_hash::FxHashMap as HashMap;
 use tap::Tap;
 use tracing::instrument;
@@ -86,6 +87,43 @@ impl<'a> GitWorktree<'a> {
                     }
                 }
             })?)
+    }
+
+    /// Check if we're inside a working tree.
+    ///
+    /// This will return false for a bare worktree like a `.git` directory!
+    #[instrument(level = "trace")]
+    pub fn is_inside(&self) -> miette::Result<bool> {
+        Ok(self
+            .0
+            .rev_parse_command()
+            .arg("--is-inside-work-tree")
+            .output_checked_as(|context: OutputContext<Utf8Output>| {
+                if !context.status().success() {
+                    Err(context.error())
+                } else {
+                    let stdout = context.output().stdout.trim();
+                    match stdout {
+                        "true" => Ok(true),
+                        "false" => Ok(false),
+                        _ => Err(context.error_msg("Expected 'true' or 'false'")),
+                    }
+                }
+            })?)
+    }
+
+    /// Get the root of this worktree. Fails if not in a worktree.
+    #[instrument(level = "trace")]
+    pub fn root(&self) -> miette::Result<Utf8PathBuf> {
+        Ok(self
+            .0
+            .rev_parse_command()
+            .arg("--show-toplevel")
+            .output_checked_utf8()
+            .wrap_err("Failed to get worktree root")?
+            .stdout
+            .trim()
+            .into())
     }
 
     #[instrument(level = "trace")]

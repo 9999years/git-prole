@@ -129,6 +129,16 @@ impl Deref for Worktrees {
     }
 }
 
+impl IntoIterator for Worktrees {
+    type Item = (Utf8PathBuf, Worktree);
+
+    type IntoIter = std::collections::hash_map::IntoIter<Utf8PathBuf, Worktree>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.inner.into_iter()
+    }
+}
+
 impl Display for Worktrees {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut trees = self.values().peekable();

@@ -12,7 +12,10 @@ use tracing::instrument;
 macro_rules! push_error {
     ($expr:expr, $vec:ident) => {
         match $expr {
-            Err(error) => $vec.push(error),
+            Err(error) => {
+                tracing::debug!("{error}");
+                $vec.push(error)
+            }
             Ok(_) => {}
         }
     };
