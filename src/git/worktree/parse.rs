@@ -24,7 +24,7 @@ use crate::parse::till_null;
 use crate::CommitHash;
 use crate::Git;
 use crate::LocalBranchRef;
-use crate::NormalPath;
+use crate::PathDisplay;
 use crate::Ref;
 use crate::ResolvedCommitish;
 
@@ -256,12 +256,7 @@ pub struct Worktree {
 
 impl Display for Worktree {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{} {}",
-            NormalPath::try_display_cwd(&self.path),
-            self.head
-        )?;
+        write!(f, "{} {}", self.path.display_path_cwd(), self.head)?;
 
         if self.is_main {
             write!(

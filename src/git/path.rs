@@ -9,7 +9,7 @@ use miette::IntoDiagnostic;
 use tracing::instrument;
 use utf8_command::Utf8Output;
 
-use crate::NormalPath;
+use crate::PathDisplay;
 
 use super::Git;
 
@@ -39,7 +39,7 @@ impl<'a> GitPath<'a> {
         } else {
             Err(miette!(
                 "Path is not in a working tree or a bare repository: {}",
-                NormalPath::try_display_cwd(self.0.get_directory())
+                self.0.get_directory().display_path_cwd()
             ))
         }
     }
