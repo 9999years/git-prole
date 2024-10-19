@@ -1,6 +1,8 @@
+use std::borrow::Cow;
 use std::fmt::Display;
 use std::process::Command;
 
+use camino::Utf8Path;
 use camino::Utf8PathBuf;
 use command_error::CommandExt;
 use command_error::Utf8ProgramAndArgs;
@@ -17,8 +19,9 @@ use crate::format_bulleted_list::format_bulleted_list;
 use crate::git::BranchRef;
 use crate::git::Git;
 use crate::git::LocalBranchRef;
-use crate::normal_path::NormalPath;
 use crate::AddWorktreeOpts;
+use crate::PathDisplay;
+use crate::Utf8Absolutize;
 
 /// A plan for creating a new `git worktree`.
 #[derive(Debug, Clone)]
@@ -26,7 +29,7 @@ pub struct WorktreePlan<'a> {
     git: AppGit<'a>,
     /// The directory to run commands from.
     worktree: Utf8PathBuf,
-    destination: NormalPath,
+    destination: Utf8PathBuf,
     branch: BranchStartPointPlan,
     /// Relative paths to copy to the new worktree, if any.
     copy_untracked: Vec<Utf8PathBuf>,
@@ -58,24 +61,31 @@ impl<'a> WorktreePlan<'a> {
         git: &AppGit<'_>,
         args: &AddArgs,
         new_branch: &LocalBranchRef,
-    ) -> miette::Result<NormalPath> {
+    ) -> miette::Result<Utf8PathBuf> {
         match &args.inner.name_or_path {
             Some(name_or_path) => {
                 if name_or_path.contains('/') {
                     // Test case: `add_by_path`.
-                    NormalPath::from_cwd(name_or_path)
+                    Utf8Path::new(name_or_path)
+                        .absolutize()
+                        .map(Cow::into_owned)
                 } else {
                     // Test case: `add_by_name_new_local`.
-                    NormalPath::from_cwd(
-                        git.worktree()
-                            .container()?
-                            .tap_mut(|p| p.push(name_or_path)),
-                    )
+                    git.worktree()
+                        .container()?
+                        .tap_mut(|p| p.push(name_or_path))
+                        .absolutize()
+                        .map(Cow::into_owned)
                 }
             }
             // Test case: `add_branch_new_local`.
-            None => NormalPath::from_cwd(git.worktree().path_for(new_branch.branch_name())?),
+            None => git
+                .worktree()
+                .path_for(new_branch.branch_name())?
+                .absolutize()
+                .map(Cow::into_owned),
         }
+        .into_diagnostic()
     }
 
     fn command(&self, git: &Git) -> Command {
@@ -159,7 +169,8 @@ impl Display for WorktreePlan<'_> {
         write!(
             f,
             "Creating worktree in {} for {}",
-            self.destination, self.branch,
+            self.destination.display_path_cwd(),
+            self.branch,
         )?;
 
         if !self.copy_untracked.is_empty() {

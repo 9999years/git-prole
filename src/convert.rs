@@ -1,7 +1,9 @@
+use std::borrow::Cow;
 use std::fmt::Display;
 
 use camino::Utf8PathBuf;
 use miette::miette;
+use miette::IntoDiagnostic;
 use owo_colors::OwoColorize;
 use owo_colors::Stream;
 use rustc_hash::FxHashSet as HashSet;
@@ -13,11 +15,12 @@ use crate::format_bulleted_list_multiline;
 use crate::fs;
 use crate::git::BranchRef;
 use crate::git::LocalBranchRef;
-use crate::normal_path::NormalPath;
 use crate::only_paths_in_parent_directory;
 use crate::topological_sort::topological_sort;
+use crate::utf8absolutize::Utf8Absolutize;
 use crate::utf8tempdir::Utf8TempDir;
 use crate::AddWorktreeOpts;
+use crate::PathDisplay;
 use crate::RenamedWorktree;
 use crate::ResolveUniqueNameOpts;
 use crate::Worktree;
@@ -64,11 +67,11 @@ impl Display for ConvertPlan<'_> {
         write!(
             f,
             "Converting {} to a worktree repository{}.",
-            NormalPath::try_display_cwd(&self.repo),
+            self.repo.display_path_cwd(),
             if self.repo == self.destination {
                 String::new()
             } else {
-                format!(" at {}", NormalPath::try_display_cwd(&self.destination))
+                format!(" at {}", self.destination.display_path_cwd())
             },
         )?;
 
@@ -79,8 +82,8 @@ impl Display for ConvertPlan<'_> {
             .map(|worktree| {
                 format!(
                     "{} -> {}",
-                    NormalPath::try_display_cwd(&worktree.worktree.path),
-                    NormalPath::try_display_cwd(worktree.destination(self)),
+                    worktree.worktree.path.display_path_cwd(),
+                    worktree.destination(self).display_path_cwd(),
                 )
             })
             .collect::<Vec<_>>();
@@ -97,8 +100,8 @@ impl Display for ConvertPlan<'_> {
                         .map(|worktree| {
                             format!(
                                 "{} -> {}",
-                                NormalPath::try_display_cwd(&worktree.worktree.path),
-                                NormalPath::try_display_cwd(worktree.destination(self)),
+                                worktree.worktree.path.display_path_cwd(),
+                                worktree.destination(self).display_path_cwd(),
                             )
                         })
                 )
@@ -118,7 +121,7 @@ impl Display for ConvertPlan<'_> {
                             .start_point
                             .qualified_branch_name()
                             .if_supports_color(Stream::Stdout, |text| text.cyan()),
-                        NormalPath::try_display_cwd(worktree.destination(self)),
+                        worktree.destination(self).display_path_cwd(),
                     )
                 }))
             )?;
@@ -138,8 +141,8 @@ impl Display for ConvertPlan<'_> {
                     format_bulleted_list_multiline([
                         format!(
                             "{} -> {}",
-                            NormalPath::try_display_cwd(main_plan.git_dir()),
-                            NormalPath::try_display_cwd(main_plan.git_destination(self)),
+                            main_plan.git_dir().display_path_cwd(),
+                            main_plan.git_destination(self).display_path_cwd(),
                         )
                     ])
                 )?;
@@ -279,7 +282,7 @@ impl<'a> ConvertPlan<'a> {
         tracing::debug!(
             "Worktree names resolved:\n{}",
             format_bulleted_list(worktrees.iter().map(|(path, worktree)| {
-                format!("{} → {}", NormalPath::try_display_cwd(path), &worktree.name)
+                format!("{} → {}", path.display_path_cwd(), &worktree.name)
             }))
         );
 
@@ -324,9 +327,9 @@ impl<'a> ConvertPlan<'a> {
             format_bulleted_list(ret.worktrees.iter().map(|plan| {
                 format!(
                     "{} → {} →  {}",
-                    NormalPath::try_display_cwd(&plan.worktree.path),
-                    NormalPath::try_display_cwd(plan.temp_destination(&ret)),
-                    NormalPath::try_display_cwd(plan.destination(&ret)),
+                    plan.worktree.path.display_path_cwd(),
+                    plan.temp_destination(&ret).display_path_cwd(),
+                    plan.destination(&ret).display_path_cwd(),
                 )
             }))
         );
@@ -334,16 +337,16 @@ impl<'a> ConvertPlan<'a> {
         match &ret.make_bare {
             Some(make_bare) => {
                 tracing::debug!(
-                    git_dir=%NormalPath::try_display_cwd(make_bare.git_dir()),
-                    temp_git_destination=%NormalPath::try_display_cwd(make_bare.temp_git_destination(&ret)),
-                    git_destination=%NormalPath::try_display_cwd(make_bare.git_destination(&ret)),
-                    worktree_temp_git_destination=%NormalPath::try_display_cwd(make_bare.worktree_temp_git_destination(&ret)),
-                    worktree_git_destination=%NormalPath::try_display_cwd(make_bare.worktree_git_destination(&ret)),
+                    git_dir=%make_bare.git_dir().display_path_cwd(),
+                    temp_git_destination=%make_bare.temp_git_destination(&ret).display_path_cwd(),
+                    git_destination=%make_bare.git_destination(&ret).display_path_cwd(),
+                    worktree_temp_git_destination=%make_bare.worktree_temp_git_destination(&ret).display_path_cwd(),
+                    worktree_git_destination=%make_bare.worktree_git_destination(&ret).display_path_cwd(),
                     worktree_plan=%format!(
                         "{} → {} →  {}",
-                        NormalPath::try_display_cwd(&make_bare.inner.worktree.path),
-                        NormalPath::try_display_cwd(make_bare.inner.temp_destination(&ret)),
-                        NormalPath::try_display_cwd(make_bare.inner.destination(&ret)),
+                        make_bare.inner.worktree.path.display_path_cwd(),
+                        make_bare.inner.temp_destination(&ret).display_path_cwd(),
+                        make_bare.inner.destination(&ret).display_path_cwd(),
                     ),
                     "Plan for converting to a bare repository determined",
                 );
@@ -363,7 +366,11 @@ impl<'a> ConvertPlan<'a> {
     ) -> miette::Result<Utf8PathBuf> {
         if let Some(destination) = &opts.destination {
             // `convert_destination_explicit`
-            return Ok(NormalPath::from_cwd(destination.clone())?.into());
+            return destination
+                .clone()
+                .absolutize()
+                .map(Cow::into_owned)
+                .into_diagnostic();
         }
 
         let main = worktrees.main();
@@ -513,7 +520,7 @@ impl<'a> ConvertPlan<'a> {
 
         tracing::info!(
             "{} has been converted to a worktree checkout",
-            NormalPath::from_cwd(&self.destination)?
+            self.destination.display_path_cwd()
         );
         tracing::info!("You may need to `cd .` to refresh your shell");
 
