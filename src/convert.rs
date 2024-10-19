@@ -64,6 +64,14 @@ pub struct ConvertPlan<'a> {
 
 impl Display for ConvertPlan<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.is_no_op() {
+            return write!(
+                f,
+                "{} is already a worktree repository",
+                self.repo.display_path_cwd()
+            );
+        }
+
         write!(
             f,
             "Converting {} to a worktree repository{}.",
@@ -433,7 +441,9 @@ impl<'a> ConvertPlan<'a> {
     pub fn execute(&self) -> miette::Result<()> {
         tracing::info!("{self}");
 
-        if self.git.config.cli.dry_run {
+        // Tests:
+        // - `convert_no_op`
+        if self.git.config.cli.dry_run || self.is_no_op() {
             return Ok(());
         }
 
@@ -525,6 +535,15 @@ impl<'a> ConvertPlan<'a> {
         tracing::info!("You may need to `cd .` to refresh your shell");
 
         Ok(())
+    }
+
+    pub fn is_no_op(&self) -> bool {
+        self.make_bare.is_none()
+            && self.new_worktrees.is_empty()
+            && self
+                .worktrees
+                .iter()
+                .all(|plan| plan.worktree.path == plan.destination(self))
     }
 }
 
