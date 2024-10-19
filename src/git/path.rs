@@ -5,7 +5,6 @@ use command_error::CommandExt;
 use command_error::OutputContext;
 use miette::miette;
 use miette::Context;
-use miette::IntoDiagnostic;
 use tracing::instrument;
 use utf8_command::Utf8Output;
 
@@ -47,7 +46,8 @@ impl<'a> GitPath<'a> {
     /// Check if we're inside a working tree.
     #[instrument(level = "trace")]
     pub fn is_inside_work_tree(&self) -> miette::Result<bool> {
-        self.0
+        Ok(self
+            .0
             .rev_parse_command()
             .arg("--is-inside-work-tree")
             .output_checked_as(|context: OutputContext<Utf8Output>| {
@@ -61,8 +61,7 @@ impl<'a> GitPath<'a> {
                         _ => Err(context.error_msg("Expected 'true' or 'false'")),
                     }
                 }
-            })
-            .into_diagnostic()
+            })?)
     }
 
     /// `git rev-parse --show-toplevel`
@@ -73,7 +72,6 @@ impl<'a> GitPath<'a> {
             .rev_parse_command()
             .arg("--show-toplevel")
             .output_checked_utf8()
-            .into_diagnostic()
             .wrap_err("Failed to get working directory of repository")?
             .stdout
             .trim()
@@ -83,22 +81,22 @@ impl<'a> GitPath<'a> {
     /// Get the `.git` directory path.
     #[expect(dead_code)] // #[instrument(level = "trace")]
     pub(crate) fn get_git_dir(&self) -> miette::Result<Utf8PathBuf> {
-        self.0
+        Ok(self
+            .0
             .rev_parse_command()
             .arg("--git-dir")
             .output_checked_utf8()
-            .into_diagnostic()
-            .map(|output| Utf8PathBuf::from(output.stdout.trim()))
+            .map(|output| Utf8PathBuf::from(output.stdout.trim()))?)
     }
 
     /// Get the common `.git` directory for all worktrees.
     #[instrument(level = "trace")]
     pub fn git_common_dir(&self) -> miette::Result<Utf8PathBuf> {
-        self.0
+        Ok(self
+            .0
             .rev_parse_command()
             .arg("--git-common-dir")
             .output_checked_utf8()
-            .into_diagnostic()
-            .map(|output| Utf8PathBuf::from(output.stdout.trim()))
+            .map(|output| Utf8PathBuf::from(output.stdout.trim()))?)
     }
 }

@@ -1,7 +1,6 @@
 use command_error::CommandExt;
 use expect_test::expect;
 use git_prole::HeadKind;
-use miette::IntoDiagnostic;
 use pretty_assertions::assert_eq;
 use test_harness::GitProle;
 use test_harness::WorktreeState;
@@ -16,11 +15,7 @@ fn convert_detached_head() -> miette::Result<()> {
         git switch --detach
         ")?;
 
-    prole
-        .cd_cmd("my-repo")
-        .arg("convert")
-        .status_checked()
-        .into_diagnostic()?;
+    prole.cd_cmd("my-repo").arg("convert").status_checked()?;
 
     assert_eq!(
         prole.git("my-repo/main").refs().head_kind()?,

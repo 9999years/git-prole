@@ -1,5 +1,4 @@
 use command_error::CommandExt;
-use miette::IntoDiagnostic;
 use test_harness::GitProle;
 use test_harness::WorktreeState;
 
@@ -11,8 +10,7 @@ fn convert_destination_explicit() -> miette::Result<()> {
     prole
         .cd_cmd("my-repo")
         .args(["convert", "../puppy"])
-        .status_checked()
-        .into_diagnostic()?;
+        .status_checked()?;
 
     prole.sh("ls -la && ls -la puppy")?;
 

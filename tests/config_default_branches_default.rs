@@ -1,5 +1,4 @@
 use command_error::CommandExt;
-use miette::IntoDiagnostic;
 use test_harness::GitProle;
 use test_harness::WorktreeState;
 
@@ -22,11 +21,7 @@ fn config_default_branches_default() -> miette::Result<()> {
         git remote rename origin puppy
         ")?;
 
-    prole
-        .cd_cmd("my-repo")
-        .arg("convert")
-        .status_checked()
-        .into_diagnostic()?;
+    prole.cd_cmd("my-repo").arg("convert").status_checked()?;
 
     prole
         .repo_state("my-repo")

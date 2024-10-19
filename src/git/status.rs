@@ -7,7 +7,6 @@ use camino::Utf8PathBuf;
 use command_error::CommandExt;
 use command_error::OutputContext;
 use miette::miette;
-use miette::IntoDiagnostic;
 use tracing::instrument;
 use utf8_command::Utf8Output;
 use winnow::combinator::eof;
@@ -38,7 +37,8 @@ impl<'a> GitStatus<'a> {
 
     #[instrument(level = "trace")]
     pub fn get(&self) -> miette::Result<Status> {
-        self.0
+        Ok(self
+            .0
             .command()
             .args(["status", "--porcelain=v1", "--ignored=traditional", "-z"])
             .output_checked_as(|context: OutputContext<Utf8Output>| {
@@ -47,8 +47,7 @@ impl<'a> GitStatus<'a> {
                 } else {
                     Err(context.error())
                 }
-            })
-            .into_diagnostic()
+            })?)
     }
 
     /// List untracked files and directories.
@@ -66,8 +65,7 @@ impl<'a> GitStatus<'a> {
                 "--directory",
                 "-z",
             ])
-            .output_checked_utf8()
-            .into_diagnostic()?
+            .output_checked_utf8()?
             .stdout
             .split('\0')
             .filter(|path| !path.is_empty())

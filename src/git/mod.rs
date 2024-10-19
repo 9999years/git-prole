@@ -4,7 +4,6 @@ use std::process::Command;
 use camino::Utf8Path;
 use camino::Utf8PathBuf;
 use command_error::CommandExt;
-use miette::IntoDiagnostic;
 use tracing::instrument;
 
 mod branch;
@@ -174,17 +173,14 @@ impl Git {
         if let Some(destination) = destination {
             command.arg(destination);
         }
-        command.status_checked().into_diagnostic()?;
+        command.status_checked()?;
         Ok(())
     }
 
     /// `git reset`.
     #[instrument(level = "trace")]
     pub fn reset(&self) -> miette::Result<()> {
-        self.command()
-            .arg("reset")
-            .output_checked_utf8()
-            .into_diagnostic()?;
+        self.command().arg("reset").output_checked_utf8()?;
         Ok(())
     }
 }

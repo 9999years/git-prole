@@ -2,7 +2,6 @@ use std::process::Command;
 
 use command_error::CommandExt;
 use miette::miette;
-use miette::IntoDiagnostic;
 use which::which_global;
 
 use crate::app_git::AppGit;
@@ -31,8 +30,7 @@ pub fn clone(git: AppGit<'_>, args: CloneArgs) -> miette::Result<()> {
         Command::new("gh")
             .args(["repo", "clone", &args.repository, destination.as_str()])
             .args(args.clone_args)
-            .status_checked()
-            .into_diagnostic()?;
+            .status_checked()?;
     } else {
         // Test case: `clone_simple`.
         git.clone_repository(&args.repository, Some(&destination), &args.clone_args)?;
