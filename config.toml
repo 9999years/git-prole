@@ -48,3 +48,13 @@ copy_untracked = true
 #
 # See: https://cli.github.com/
 enable_gh = false
+
+# Commands to run when a new worktree is added.
+commands = [
+    # "direnv allow",
+    # { sh = '''
+    #   if [ -e flake.nix ]; then
+    #     nix develop --command true
+    #   fi
+    #   ''' },
+]
