@@ -126,7 +126,10 @@ impl<'a> WorktreePlan<'a> {
         if self.copy_untracked.is_empty() {
             return Ok(());
         }
-        tracing::info!("Copying untracked files to {}", self.destination);
+        tracing::info!(
+            "Copying untracked files to {}",
+            self.destination.display_path_cwd()
+        );
         for path in &self.copy_untracked {
             let from = self.worktree.join(path);
             let to = self.destination.join(path);

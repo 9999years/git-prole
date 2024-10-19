@@ -3,6 +3,8 @@
 //! Symlink destinations are always transformed into absolute paths.
 
 use fs_err as fs;
+use fs_err::os::unix::fs as unix;
+use fs_err::PathExt;
 use std::io::{Error, ErrorKind, Result};
 use std::path::Path;
 use tracing::instrument;
@@ -66,17 +68,20 @@ macro_rules! make_err {
 #[instrument(level = "trace", skip_all)]
 #[expect(clippy::disallowed_methods)]
 pub fn copy_dir<Q: AsRef<Path>, P: AsRef<Path>>(from: P, to: Q) -> Result<Vec<Error>> {
-    if !from.as_ref().exists() {
-        return Err(make_err!("source path does not exist", ErrorKind::NotFound));
-    } else if to.as_ref().exists() {
+    let from_meta = from.as_ref().fs_err_symlink_metadata()?;
+
+    if to.as_ref().fs_err_symlink_metadata().is_ok() {
         return Err(make_err!("target path exists", ErrorKind::AlreadyExists));
     }
 
     let mut errors = Vec::new();
 
-    // copying a regular file is EZ
-    if from.as_ref().is_file() {
+    // copying a regular file/symlink is EZ
+    if from_meta.is_file() {
         return fs::copy(&from, &to).map(|_| Vec::new());
+    } else if from_meta.is_symlink() {
+        let link_contents = fs::read_link(&from)?;
+        return unix::symlink(link_contents, &to).map(|_| Vec::new());
     }
 
     fs::create_dir(&to)?;
@@ -91,8 +96,8 @@ pub fn copy_dir<Q: AsRef<Path>, P: AsRef<Path>>(from: P, to: Q) -> Result<Vec<Er
     // of hard links.
     let target_is_under_source = from
         .as_ref()
-        .canonicalize()
-        .and_then(|fc| to.as_ref().canonicalize().map(|tc| (fc, tc)))
+        .fs_err_canonicalize()
+        .and_then(|fc| to.as_ref().fs_err_canonicalize().map(|tc| (fc, tc)))
         .map(|(fc, tc)| tc.starts_with(fc))?;
 
     if target_is_under_source {
@@ -119,7 +124,7 @@ pub fn copy_dir<Q: AsRef<Path>, P: AsRef<Path>>(from: P, to: Q) -> Result<Vec<Er
             target_path
         };
 
-        let source_metadata = match entry.metadata() {
+        let source_metadata = match entry.path().fs_err_symlink_metadata() {
             Err(error) => {
                 errors.push(make_err!(format!(
                     "walkdir metadata error for {:?}: {error}",
@@ -148,11 +153,9 @@ pub fn copy_dir<Q: AsRef<Path>, P: AsRef<Path>>(from: P, to: Q) -> Result<Vec<Er
             // `push_error!` macro.
             let dest = match fs::read_link(entry.path()) {
                 Ok(dest) => {
-                    if dest.is_absolute() {
-                        dest
-                    } else {
-                        entry.path().join(dest)
-                    }
+                    // Note: This keeps relative symlinks relative. Hopefully they point
+                    // to the same directory or something reasonable!
+                    dest
                 }
                 Err(error) => {
                     errors.push(error);
