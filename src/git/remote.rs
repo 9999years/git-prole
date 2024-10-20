@@ -13,23 +13,31 @@ use winnow::token::take_till;
 use winnow::PResult;
 use winnow::Parser;
 
-use super::Git;
+use super::GitLike;
 use super::LocalBranchRef;
 use super::Ref;
 use super::RemoteBranchRef;
 
 /// Git methods for dealing with remotes.
 #[repr(transparent)]
-pub struct GitRemote<'a>(&'a Git);
+pub struct GitRemote<'a, G>(&'a G);
 
-impl Debug for GitRemote<'_> {
+impl<G> Debug for GitRemote<'_, G>
+where
+    G: GitLike,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Debug::fmt(self.0, f)
+        f.debug_tuple("GitRemote")
+            .field(&self.0.get_current_dir().as_ref())
+            .finish()
     }
 }
 
-impl<'a> GitRemote<'a> {
-    pub fn new(git: &'a Git) -> Self {
+impl<'a, G> GitRemote<'a, G>
+where
+    G: GitLike,
+{
+    pub fn new(git: &'a G) -> Self {
         Self(git)
     }
 

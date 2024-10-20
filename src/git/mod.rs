@@ -10,6 +10,7 @@ mod branch;
 mod commit_hash;
 mod commitish;
 mod config;
+mod git_like;
 mod head_state;
 mod path;
 mod refs;
@@ -22,6 +23,7 @@ pub use branch::GitBranch;
 pub use commit_hash::CommitHash;
 pub use commitish::ResolvedCommitish;
 pub use config::GitConfig;
+pub use git_like::GitLike;
 pub use head_state::HeadKind;
 pub use path::GitPath;
 pub use refs::BranchRef;
@@ -49,20 +51,64 @@ use crate::current_dir::current_dir_utf8;
 
 /// `git` CLI wrapper.
 #[derive(Clone)]
-pub struct Git {
-    current_dir: Utf8PathBuf,
+pub struct Git<C> {
+    current_dir: C,
     env_variables: Vec<(String, String)>,
     args: Vec<String>,
 }
 
-impl Debug for Git {
+impl<C> Debug for Git<C>
+where
+    C: AsRef<Utf8Path>,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("Git").field(&self.current_dir).finish()
+        f.debug_tuple("Git")
+            .field(&self.current_dir.as_ref())
+            .finish()
     }
 }
 
-impl Git {
-    pub fn from_path(current_dir: Utf8PathBuf) -> Self {
+impl<C> AsRef<Utf8Path> for Git<C>
+where
+    C: AsRef<Utf8Path>,
+{
+    fn as_ref(&self) -> &Utf8Path {
+        self.current_dir.as_ref()
+    }
+}
+
+impl<C> AsRef<Git<C>> for Git<C> {
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
+impl<C> GitLike for Git<C>
+where
+    C: AsRef<Utf8Path>,
+{
+    type CurrentDir = C;
+
+    fn as_git(&self) -> &Git<Self::CurrentDir> {
+        self
+    }
+
+    fn get_current_dir(&self) -> &Self::CurrentDir {
+        &self.current_dir
+    }
+}
+
+impl Git<Utf8PathBuf> {
+    pub fn from_current_dir() -> miette::Result<Self> {
+        Ok(Self::from_path(current_dir_utf8()?))
+    }
+}
+
+impl<C> Git<C>
+where
+    C: AsRef<Utf8Path>,
+{
+    pub fn from_path(current_dir: C) -> Self {
         Self {
             current_dir,
             env_variables: Vec::new(),
@@ -70,34 +116,26 @@ impl Git {
         }
     }
 
-    pub fn from_current_dir() -> miette::Result<Self> {
-        Ok(Self::from_path(current_dir_utf8()?))
-    }
-
-    pub fn with_config(self, config: &Config) -> AppGit<'_> {
+    pub fn with_config(self, config: &Config) -> AppGit<'_, C> {
         AppGit { git: self, config }
     }
 
     /// Get a `git` command.
     pub fn command(&self) -> Command {
         let mut command = Command::new("git");
-        command.current_dir(&self.current_dir);
+        command.current_dir(self.current_dir.as_ref());
         command.envs(self.env_variables.iter().map(|(key, value)| (key, value)));
         command.args(&self.args);
         command
     }
 
-    pub fn get_directory(&self) -> &Utf8Path {
-        &self.current_dir
-    }
-
     /// Set the current working directory for `git` commands to be run in.
-    pub fn set_directory(&mut self, path: Utf8PathBuf) {
+    pub fn set_current_dir(&mut self, path: C) {
         self.current_dir = path;
     }
 
-    pub fn with_directory(&self, path: Utf8PathBuf) -> Self {
-        Self {
+    pub fn with_current_dir<C2>(&self, path: C2) -> Git<C2> {
+        Git {
             current_dir: path,
             env_variables: self.env_variables.clone(),
             args: self.args.clone(),
@@ -118,41 +156,6 @@ impl Git {
 
     pub fn args(&mut self, iter: impl IntoIterator<Item = String>) {
         self.args.extend(iter);
-    }
-
-    /// Methods for dealing with Git remotes.
-    pub fn remote(&self) -> GitRemote<'_> {
-        GitRemote::new(self)
-    }
-
-    /// Methods for dealing with Git remotes.
-    pub fn path(&self) -> GitPath<'_> {
-        GitPath::new(self)
-    }
-
-    /// Methods for dealing with Git remotes.
-    pub fn worktree(&self) -> GitWorktree<'_> {
-        GitWorktree::new(self)
-    }
-
-    /// Methods for dealing with Git refs.
-    pub fn refs(&self) -> GitRefs<'_> {
-        GitRefs::new(self)
-    }
-
-    /// Methods for dealing with Git statuses and the working tree.
-    pub fn status(&self) -> GitStatus<'_> {
-        GitStatus::new(self)
-    }
-
-    /// Methods for dealing with Git statuses and the working tree.
-    pub fn config(&self) -> GitConfig<'_> {
-        GitConfig::new(self)
-    }
-
-    /// Methods for dealing with Git statuses and the working tree.
-    pub fn branch(&self) -> GitBranch<'_> {
-        GitBranch::new(self)
     }
 
     pub(crate) fn rev_parse_command(&self) -> Command {

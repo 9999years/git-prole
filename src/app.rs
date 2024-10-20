@@ -1,4 +1,5 @@
 use calm_io::stdout;
+use camino::Utf8PathBuf;
 use clap::CommandFactory;
 use miette::miette;
 use miette::IntoDiagnostic;
@@ -23,7 +24,7 @@ impl App {
         Self { config }
     }
 
-    pub fn git(&self) -> miette::Result<AppGit<'_>> {
+    pub fn git(&self) -> miette::Result<AppGit<'_, Utf8PathBuf>> {
         Ok(Git::from_current_dir()?.with_config(&self.config))
     }
 

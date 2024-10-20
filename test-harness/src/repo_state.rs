@@ -1,12 +1,15 @@
+use std::fmt::Debug;
 use std::fmt::Display;
 use std::str::FromStr;
 
+use camino::Utf8Path;
 use camino::Utf8PathBuf;
 use expect_test::Expect;
 use git_prole::format_bulleted_list_multiline;
 use git_prole::fs;
 use git_prole::BranchRef;
 use git_prole::Git;
+use git_prole::GitLike;
 use git_prole::LocalBranchRef;
 use git_prole::Ref;
 use git_prole::RemoteBranchRef;
@@ -22,8 +25,7 @@ use rustc_hash::FxHashMap as HashMap;
 /// A repository state, which can be checked against a real repository.
 #[derive(Debug)]
 pub struct RepoState {
-    git: Git,
-    root: Utf8PathBuf,
+    git: Git<Utf8PathBuf>,
     git_dir: Option<Utf8PathBuf>,
     worktrees: Option<Vec<WorktreeState>>,
 }
@@ -32,20 +34,23 @@ impl RepoState {
     /// Construct a new repository state with the given [`Git`] object.
     ///
     /// The [`Git`]'s directory is used as the repository root.
-    pub fn new(git: Git) -> Self {
-        let root = git.get_directory().to_owned();
+    pub fn new(git: Git<Utf8PathBuf>) -> Self {
         Self {
             git,
-            root,
             git_dir: Default::default(),
             worktrees: Default::default(),
         }
     }
 
+    /// Get the root of the repository.
+    fn root(&self) -> &Utf8Path {
+        self.git.get_current_dir().as_ref()
+    }
+
     /// Expect the repository to have its `.git` directory at the given path, relative to the
     /// repository root.
     pub fn git_dir(mut self, path: &str) -> Self {
-        self.git_dir = Some(self.root.join(path));
+        self.git_dir = Some(self.root().join(path));
         self
     }
 
@@ -79,7 +84,7 @@ impl RepoState {
                 .iter()
                 .map(|worktree| {
                     (
-                        self.root
+                        self.root()
                             .join(&worktree.path)
                             .canonicalize_utf8()
                             .map_err(|err| format!("{err}: {}", worktree.path))
@@ -288,9 +293,12 @@ impl WorktreeState {
     }
 
     #[track_caller]
-    fn check(git: &Git, expected: &Self, actual: &Worktree) -> Vec<String> {
+    fn check<C>(git: &Git<C>, expected: &Self, actual: &Worktree) -> Vec<String>
+    where
+        C: AsRef<Utf8Path>,
+    {
         let mut problems = Vec::new();
-        let git = git.with_directory(actual.path.clone());
+        let git = git.with_current_dir(actual.path.as_path());
 
         Self::check_is_main(&mut problems, expected, actual);
         Self::check_head(&mut problems, expected, actual);
@@ -414,7 +422,10 @@ impl WorktreeState {
     }
 
     #[track_caller]
-    fn check_status(problems: &mut Vec<String>, git: &Git, expected: &Self, actual: &Worktree) {
+    fn check_status<C>(problems: &mut Vec<String>, git: &Git<C>, expected: &Self, actual: &Worktree)
+    where
+        C: AsRef<Utf8Path>,
+    {
         let expected_path = &expected.path;
 
         let expected_status = match &expected.status {

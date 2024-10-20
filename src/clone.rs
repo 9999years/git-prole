@@ -1,5 +1,7 @@
+use std::borrow::Cow;
 use std::process::Command;
 
+use camino::Utf8Path;
 use command_error::CommandExt;
 use miette::miette;
 use which::which_global;
@@ -12,10 +14,13 @@ use crate::current_dir::current_dir_utf8;
 use crate::gh::looks_like_gh_url;
 use crate::git::repository_url_destination;
 
-pub fn clone(git: AppGit<'_>, args: CloneArgs) -> miette::Result<()> {
-    let destination = match args.directory {
-        Some(directory) => directory.to_owned(),
-        None => current_dir_utf8()?.join(repository_url_destination(&args.repository)),
+pub fn clone<C>(git: AppGit<'_, C>, args: CloneArgs) -> miette::Result<()>
+where
+    C: AsRef<Utf8Path>,
+{
+    let destination = match args.directory.as_deref() {
+        Some(directory) => Cow::Borrowed(directory),
+        None => Cow::Owned(current_dir_utf8()?.join(repository_url_destination(&args.repository))),
     };
 
     if git.config.cli.dry_run {
@@ -37,7 +42,7 @@ pub fn clone(git: AppGit<'_>, args: CloneArgs) -> miette::Result<()> {
     }
 
     ConvertPlan::new(
-        git.with_directory(destination),
+        git.with_current_dir(destination),
         ConvertPlanOpts {
             default_branch: None,
             destination: None,

@@ -1,11 +1,13 @@
 use std::borrow::Cow;
 
+use camino::Utf8Path;
 use camino::Utf8PathBuf;
 use rustc_hash::FxHashMap as HashMap;
 use rustc_hash::FxHashSet as HashSet;
 use tracing::instrument;
 
-use crate::Git;
+use crate::git::GitLike;
+use crate::AppGit;
 
 #[cfg(doc)]
 use super::GitWorktree;
@@ -44,10 +46,13 @@ pub struct ResolveUniqueNameOpts<'a> {
 ///
 /// Anyways, this function resolves a bunch of worktrees into unique names.
 #[instrument(level = "trace")]
-pub fn resolve_unique_worktree_names(
-    git: &Git,
+pub fn resolve_unique_worktree_names<C>(
+    git: &AppGit<'_, C>,
     mut opts: ResolveUniqueNameOpts<'_>,
-) -> miette::Result<HashMap<Utf8PathBuf, RenamedWorktree>> {
+) -> miette::Result<HashMap<Utf8PathBuf, RenamedWorktree>>
+where
+    C: AsRef<Utf8Path>,
+{
     let (mut resolved, worktrees) = handle_bare_main_worktree(&mut opts.names, opts.worktrees);
 
     for (path, worktree) in worktrees.into_iter() {
@@ -119,14 +124,21 @@ pub struct RenamedWorktree {
     pub worktree: Worktree,
 }
 
-struct WorktreeNames<'a> {
-    git: &'a Git,
+struct WorktreeNames<'a, C> {
+    git: &'a AppGit<'a, C>,
     worktree: &'a Worktree,
     directory_names: &'a HashSet<&'a str>,
 }
 
-impl<'a> WorktreeNames<'a> {
-    fn new(git: &'a Git, worktree: &'a Worktree, directory_names: &'a HashSet<&'a str>) -> Self {
+impl<'a, C> WorktreeNames<'a, C>
+where
+    C: AsRef<Utf8Path>,
+{
+    fn new(
+        git: &'a AppGit<'a, C>,
+        worktree: &'a Worktree,
+        directory_names: &'a HashSet<&'a str>,
+    ) -> Self {
         Self {
             git,
             worktree,
@@ -204,6 +216,8 @@ mod tests {
     use itertools::Itertools;
 
     use crate::CommitHash;
+    use crate::Config;
+    use crate::Git;
 
     use super::*;
 
@@ -221,7 +235,8 @@ mod tests {
     {
         #[track_caller]
         fn assert(mut self) {
-            let git = Git::from_current_dir().unwrap();
+            let config = Config::test_stub();
+            let git = Git::from_current_dir().unwrap().with_config(&config);
 
             self.worktrees[0].is_main = true;
 

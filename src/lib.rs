@@ -38,6 +38,7 @@ pub use git::CommitHash;
 pub use git::Git;
 pub use git::GitBranch;
 pub use git::GitConfig;
+pub use git::GitLike;
 pub use git::GitPath;
 pub use git::GitRefs;
 pub use git::GitRemote;

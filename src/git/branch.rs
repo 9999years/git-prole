@@ -7,21 +7,29 @@ use tracing::instrument;
 use utf8_command::Utf8Output;
 
 use super::BranchRef;
-use super::Git;
+use super::GitLike;
 use super::LocalBranchRef;
 
 /// Git methods for dealing with worktrees.
 #[repr(transparent)]
-pub struct GitBranch<'a>(&'a Git);
+pub struct GitBranch<'a, G>(&'a G);
 
-impl Debug for GitBranch<'_> {
+impl<G> Debug for GitBranch<'_, G>
+where
+    G: GitLike,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Debug::fmt(self.0, f)
+        f.debug_tuple("GitBranch")
+            .field(&self.0.get_current_dir().as_ref())
+            .finish()
     }
 }
 
-impl<'a> GitBranch<'a> {
-    pub fn new(git: &'a Git) -> Self {
+impl<'a, G> GitBranch<'a, G>
+where
+    G: GitLike,
+{
+    pub fn new(git: &'a G) -> Self {
         Self(git)
     }
 

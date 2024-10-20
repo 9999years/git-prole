@@ -2,6 +2,7 @@ use std::fmt::Debug;
 use std::ops::Deref;
 use std::ops::DerefMut;
 
+use camino::Utf8Path;
 use camino::Utf8PathBuf;
 use rustc_hash::FxHashSet as HashSet;
 use tracing::instrument;
@@ -9,61 +10,82 @@ use tracing::instrument;
 use crate::config::Config;
 use crate::git::BranchRef;
 use crate::git::Git;
+use crate::git::GitLike;
 use crate::git::LocalBranchRef;
 use crate::Worktree;
 use crate::Worktrees;
 
 /// A [`Git`] with borrowed [`Config`].
 #[derive(Clone)]
-pub struct AppGit<'a> {
-    pub git: Git,
+pub struct AppGit<'a, C> {
+    pub git: Git<C>,
     pub config: &'a Config,
 }
 
-impl Debug for AppGit<'_> {
+impl<C> Debug for AppGit<'_, C>
+where
+    C: AsRef<Utf8Path>,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("AppGit")
-            .field(&self.git.get_directory())
+            .field(&self.git.get_current_dir().as_ref())
             .finish()
     }
 }
 
-impl Deref for AppGit<'_> {
-    type Target = Git;
+impl<C> Deref for AppGit<'_, C> {
+    type Target = Git<C>;
 
     fn deref(&self) -> &Self::Target {
         &self.git
     }
 }
 
-impl DerefMut for AppGit<'_> {
+impl<C> DerefMut for AppGit<'_, C> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.git
     }
 }
 
-impl AsRef<Git> for AppGit<'_> {
-    fn as_ref(&self) -> &Git {
+impl<C> AsRef<Git<C>> for AppGit<'_, C> {
+    fn as_ref(&self) -> &Git<C> {
         &self.git
     }
 }
 
-impl AsRef<Config> for AppGit<'_> {
+impl<C> AsRef<Config> for AppGit<'_, C> {
     fn as_ref(&self) -> &Config {
         self.config
     }
 }
 
-impl From<AppGit<'_>> for Git {
-    fn from(value: AppGit<'_>) -> Self {
-        value.git
+impl<C> AsRef<Utf8Path> for AppGit<'_, C>
+where
+    C: AsRef<Utf8Path>,
+{
+    fn as_ref(&self) -> &Utf8Path {
+        self.git.as_ref()
     }
 }
 
-impl<'a> AppGit<'a> {
-    pub fn with_directory(&self, path: Utf8PathBuf) -> Self {
-        Self {
-            git: self.git.with_directory(path),
+impl<C> GitLike for AppGit<'_, C>
+where
+    C: AsRef<Utf8Path>,
+{
+    type CurrentDir = C;
+
+    fn as_git(&self) -> &Git<Self::CurrentDir> {
+        &self.git
+    }
+}
+
+impl<'a, C> AppGit<'a, C>
+where
+    C: AsRef<Utf8Path>,
+{
+    pub fn with_current_dir<C2>(&self, path: C2) -> AppGit<'a, C2> {
+        AppGit {
+            git: self.git.with_current_dir(path),
             config: self.config,
         }
     }

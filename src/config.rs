@@ -36,14 +36,12 @@ impl Config {
         // TODO: add tracing settings to the config file
         install_tracing(&cli.log)?;
         let dirs = BaseDirectories::with_prefix("git-prole").into_diagnostic()?;
-        const CONFIG_FILE_NAME: &str = "config.toml";
         // TODO: Use `git config` for configuration?
         let path = cli
             .config
             .as_ref()
-            .map(|path| Ok(path.join(CONFIG_FILE_NAME)))
-            .unwrap_or_else(|| dirs.get_config_file(CONFIG_FILE_NAME).try_into())
-            .into_diagnostic()?;
+            .map(|path| Ok(path.to_owned()))
+            .unwrap_or_else(|| config_file_path(&dirs))?;
         let file = {
             if !path.exists() {
                 ConfigFile::default()
@@ -62,6 +60,26 @@ impl Config {
             cli,
         })
     }
+
+    /// A fake stub config for testing.
+    #[cfg(test)]
+    pub fn test_stub() -> Self {
+        // TODO: Make this pure-er.
+        let dirs = BaseDirectories::new().unwrap();
+        let path = config_file_path(&dirs).unwrap();
+        Self {
+            dirs,
+            file: ConfigFile::default(),
+            path,
+            cli: Cli::test_stub(),
+        }
+    }
+}
+
+fn config_file_path(dirs: &BaseDirectories) -> miette::Result<Utf8PathBuf> {
+    dirs.get_config_file(ConfigFile::FILE_NAME)
+        .try_into()
+        .into_diagnostic()
 }
 
 /// Configuration file format.
@@ -88,6 +106,8 @@ pub struct ConfigFile {
 }
 
 impl ConfigFile {
+    pub const FILE_NAME: &str = "config.toml";
+
     pub fn remotes(&self) -> Vec<String> {
         // Yeah this basically sucks. But how big could these lists really be?
         if self.remotes.is_empty() {

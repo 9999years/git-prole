@@ -1,6 +1,8 @@
 use std::borrow::Cow;
+use std::fmt::Debug;
 use std::fmt::Display;
 
+use camino::Utf8Path;
 use camino::Utf8PathBuf;
 use miette::miette;
 use miette::IntoDiagnostic;
@@ -14,6 +16,7 @@ use crate::format_bulleted_list::format_bulleted_list;
 use crate::format_bulleted_list_multiline;
 use crate::fs;
 use crate::git::BranchRef;
+use crate::git::GitLike;
 use crate::git::LocalBranchRef;
 use crate::only_paths_in_parent_directory;
 use crate::topological_sort::topological_sort;
@@ -34,9 +37,12 @@ pub struct ConvertPlanOpts {
 }
 
 #[derive(Debug)]
-pub struct ConvertPlan<'a> {
+pub struct ConvertPlan<'a, C>
+where
+    C: AsRef<Utf8Path> + Debug,
+{
     /// A Git instance in the repository to convert.
-    git: AppGit<'a>,
+    git: AppGit<'a, C>,
     /// A temporary directory where worktrees will be placed while the repository is rearranged.
     tempdir: Utf8PathBuf,
     /// The destination where the worktree container will be created.
@@ -62,7 +68,10 @@ pub struct ConvertPlan<'a> {
     new_worktrees: Vec<NewWorktreePlan>,
 }
 
-impl Display for ConvertPlan<'_> {
+impl<C> Display for ConvertPlan<'_, C>
+where
+    C: AsRef<Utf8Path> + Debug,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.is_no_op() {
             return write!(
@@ -171,9 +180,12 @@ impl Display for ConvertPlan<'_> {
     }
 }
 
-impl<'a> ConvertPlan<'a> {
+impl<'a, C> ConvertPlan<'a, C>
+where
+    C: AsRef<Utf8Path> + Debug,
+{
     #[instrument(level = "trace")]
-    pub fn new(git: AppGit<'a>, opts: ConvertPlanOpts) -> miette::Result<Self> {
+    pub fn new(git: AppGit<'a, C>, opts: ConvertPlanOpts) -> miette::Result<Self> {
         // Figuring out which worktrees to create is non-trivial:
         // - We might already have worktrees. (`convert_multiple_worktrees`)
         // - We might have any number of remotes.
@@ -464,7 +476,7 @@ impl<'a> ConvertPlan<'a> {
         if let Some(make_bare) = &self.make_bare {
             fs::rename(make_bare.git_dir(), make_bare.temp_git_destination(self))?;
             self.git
-                .with_directory(make_bare.temp_git_destination(self))
+                .with_current_dir(make_bare.temp_git_destination(self))
                 .config()
                 .set("core.bare", "true")?;
         }
@@ -489,7 +501,7 @@ impl<'a> ConvertPlan<'a> {
             // Make the main worktree into a real worktree, now that we've removed its `.git`
             // directory.
             self.git
-                .with_directory(make_bare.git_destination(self))
+                .with_current_dir(make_bare.git_destination(self))
                 .worktree()
                 .add(
                     &make_bare.inner.destination(self),
@@ -503,7 +515,7 @@ impl<'a> ConvertPlan<'a> {
                 )?;
 
             self.git
-                .with_directory(make_bare.inner.destination(self))
+                .with_current_dir(make_bare.inner.destination(self))
                 .reset()?;
             fs::rename(
                 make_bare.worktree_git_destination(self),
@@ -518,7 +530,7 @@ impl<'a> ConvertPlan<'a> {
         }
 
         // Repair worktrees with their new paths.
-        let git = self.git.with_directory(self.destination.clone());
+        let git = self.git.with_current_dir(self.destination.clone());
         git.worktree()
             .repair(self.worktrees.iter().map(|plan| plan.destination(self)))?;
 
@@ -573,12 +585,18 @@ impl From<RenamedWorktree> for WorktreePlan {
 
 impl WorktreePlan {
     /// Where we'll place the worktree in the temporary directory.
-    fn temp_destination(&self, convert_plan: &ConvertPlan<'_>) -> Utf8PathBuf {
+    fn temp_destination(
+        &self,
+        convert_plan: &ConvertPlan<'_, impl AsRef<Utf8Path> + Debug>,
+    ) -> Utf8PathBuf {
         convert_plan.tempdir.join(&self.name)
     }
 
     /// Where we'll place the worktree when we're done.
-    fn destination(&self, convert_plan: &ConvertPlan<'_>) -> Utf8PathBuf {
+    fn destination(
+        &self,
+        convert_plan: &ConvertPlan<'_, impl AsRef<Utf8Path> + Debug>,
+    ) -> Utf8PathBuf {
         convert_plan.destination.join(&self.name)
     }
 }
@@ -596,7 +614,10 @@ struct NewWorktreePlan {
 
 impl NewWorktreePlan {
     /// Where the new worktree will be created.
-    fn destination(&self, convert_plan: &ConvertPlan<'_>) -> Utf8PathBuf {
+    fn destination(
+        &self,
+        convert_plan: &ConvertPlan<'_, impl AsRef<Utf8Path> + Debug>,
+    ) -> Utf8PathBuf {
         convert_plan.destination.join(&self.name)
     }
 }
@@ -614,22 +635,34 @@ impl MainWorktreePlan {
     }
 
     /// Where we'll place the `.git` directory in the temporary directory.
-    fn temp_git_destination(&self, convert_plan: &ConvertPlan<'_>) -> Utf8PathBuf {
+    fn temp_git_destination(
+        &self,
+        convert_plan: &ConvertPlan<'_, impl AsRef<Utf8Path> + Debug>,
+    ) -> Utf8PathBuf {
         convert_plan.tempdir.join(".git")
     }
 
     /// Where we'll place the `.git` directory when we're done.
-    fn git_destination(&self, convert_plan: &ConvertPlan<'_>) -> Utf8PathBuf {
+    fn git_destination(
+        &self,
+        convert_plan: &ConvertPlan<'_, impl AsRef<Utf8Path> + Debug>,
+    ) -> Utf8PathBuf {
         convert_plan.destination.join(".git")
     }
 
     /// Where we'll place the _worktree's_ `.git` symlink in the temporary directory.
-    fn worktree_temp_git_destination(&self, convert_plan: &ConvertPlan<'_>) -> Utf8PathBuf {
+    fn worktree_temp_git_destination(
+        &self,
+        convert_plan: &ConvertPlan<'_, impl AsRef<Utf8Path> + Debug>,
+    ) -> Utf8PathBuf {
         self.inner.temp_destination(convert_plan).join(".git")
     }
 
     /// Where we'll place the _worktree's_ `.git` symlink when we're done.
-    fn worktree_git_destination(&self, convert_plan: &ConvertPlan<'_>) -> Utf8PathBuf {
+    fn worktree_git_destination(
+        &self,
+        convert_plan: &ConvertPlan<'_, impl AsRef<Utf8Path> + Debug>,
+    ) -> Utf8PathBuf {
         self.inner.destination(convert_plan).join(".git")
     }
 }

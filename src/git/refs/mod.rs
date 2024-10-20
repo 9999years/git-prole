@@ -12,7 +12,7 @@ use utf8_command::Utf8Output;
 use super::commit_hash::CommitHash;
 use super::commitish::ResolvedCommitish;
 use super::head_state::HeadKind;
-use super::Git;
+use super::GitLike;
 
 mod branch;
 mod local_branch;
@@ -26,16 +26,24 @@ pub use remote_branch::RemoteBranchRef;
 
 /// Git methods for dealing with refs.
 #[repr(transparent)]
-pub struct GitRefs<'a>(&'a Git);
+pub struct GitRefs<'a, G>(&'a G);
 
-impl Debug for GitRefs<'_> {
+impl<G> Debug for GitRefs<'_, G>
+where
+    G: GitLike,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Debug::fmt(self.0, f)
+        f.debug_tuple("GitRefs")
+            .field(&self.0.get_current_dir().as_ref())
+            .finish()
     }
 }
 
-impl<'a> GitRefs<'a> {
-    pub fn new(git: &'a Git) -> Self {
+impl<'a, G> GitRefs<'a, G>
+where
+    G: GitLike,
+{
+    pub fn new(git: &'a G) -> Self {
         Self(git)
     }
 
@@ -61,6 +69,7 @@ impl<'a> GitRefs<'a> {
     pub fn parse(&self, commitish: &str) -> miette::Result<Option<CommitHash>> {
         Ok(self
             .0
+            .as_git()
             .rev_parse_command()
             .args(["--verify", "--quiet", "--end-of-options", commitish])
             .output_checked_as(|context: OutputContext<Utf8Output>| {
@@ -79,6 +88,7 @@ impl<'a> GitRefs<'a> {
     pub fn rev_parse_symbolic_full_name(&self, commitish: &str) -> miette::Result<Option<Ref>> {
         Ok(self
             .0
+            .as_git()
             .rev_parse_command()
             .args([
                 "--symbolic-full-name",

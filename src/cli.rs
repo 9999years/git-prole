@@ -28,6 +28,22 @@ pub struct Cli {
     pub command: Command,
 }
 
+impl Cli {
+    /// A fake stub CLI for testing.
+    #[cfg(test)]
+    pub fn test_stub() -> Self {
+        Self {
+            log: "info".to_owned(),
+            dry_run: false,
+            config: None,
+            command: Command::Convert(ConvertArgs {
+                default_branch: None,
+                destination: None,
+            }),
+        }
+    }
+}
+
 #[allow(rustdoc::bare_urls)]
 #[derive(Debug, Clone, Subcommand)]
 pub enum Command {
