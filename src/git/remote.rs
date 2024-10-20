@@ -1,10 +1,12 @@
 use std::fmt::Debug;
 use std::str::FromStr;
 
+use camino::Utf8Path;
 use command_error::CommandExt;
 use command_error::OutputContext;
 use miette::miette;
 use miette::Context;
+use rustc_hash::FxHashSet;
 use tap::TryConv;
 use tracing::instrument;
 use utf8_command::Utf8Output;
@@ -12,6 +14,8 @@ use winnow::combinator::rest;
 use winnow::token::take_till;
 use winnow::PResult;
 use winnow::Parser;
+
+use crate::AppGit;
 
 use super::GitLike;
 use super::LocalBranchRef;
@@ -195,6 +199,40 @@ where
         }
         command.status_checked()?;
         Ok(())
+    }
+}
+
+impl<'a, C> GitRemote<'a, AppGit<'a, C>>
+where
+    C: AsRef<Utf8Path>,
+{
+    /// Get a list of remotes in the user's preference order.
+    #[instrument(level = "trace")]
+    pub fn list_preferred(&self) -> miette::Result<Vec<String>> {
+        let mut all_remotes = self.list()?.into_iter().collect::<FxHashSet<_>>();
+
+        let mut sorted = Vec::with_capacity(all_remotes.len());
+
+        if let Some(default_remote) = self.get_default()? {
+            if let Some(remote) = all_remotes.take(&default_remote) {
+                sorted.push(remote);
+            }
+        }
+
+        let preferred_remotes = self.0.config.file.remotes();
+        for remote in preferred_remotes {
+            if let Some(remote) = all_remotes.take(&remote) {
+                sorted.push(remote);
+            }
+        }
+
+        Ok(sorted)
+    }
+
+    /// Get the user's preferred remote, if any.
+    #[instrument(level = "trace")]
+    pub fn preferred(&self) -> miette::Result<Option<String>> {
+        Ok(self.list_preferred()?.first().cloned())
     }
 }
 
