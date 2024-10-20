@@ -20,7 +20,7 @@ use git_prole::WorktreeHead;
 use itertools::Itertools;
 use pretty_assertions::assert_eq;
 use pretty_assertions::Comparison;
-use rustc_hash::FxHashMap as HashMap;
+use rustc_hash::FxHashMap;
 
 /// A repository state, which can be checked against a real repository.
 #[derive(Debug)]
@@ -92,7 +92,7 @@ impl RepoState {
                         worktree,
                     )
                 })
-                .collect::<HashMap<_, _>>();
+                .collect::<FxHashMap<_, _>>();
 
             for (_, actual) in actual_worktrees.iter() {
                 let expected = match expected_worktrees.remove(&actual.path) {

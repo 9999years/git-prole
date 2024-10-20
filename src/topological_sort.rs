@@ -1,8 +1,8 @@
 use camino::Utf8Path;
 use camino::Utf8PathBuf;
 use miette::miette;
-use rustc_hash::FxHashMap as HashMap;
-use rustc_hash::FxHashSet as HashSet;
+use rustc_hash::FxHashMap;
+use rustc_hash::FxHashSet;
 
 /// Topologically sort a set of paths.
 ///
@@ -23,8 +23,8 @@ where
     }
 
     // Compute edges.
-    let mut edges = HashMap::<&Utf8Path, HashSet<&Utf8Path>>::default();
-    let mut incoming_edges = HashMap::<&Utf8Path, HashSet<&Utf8Path>>::default();
+    let mut edges = FxHashMap::<&Utf8Path, FxHashSet<&Utf8Path>>::default();
+    let mut incoming_edges = FxHashMap::<&Utf8Path, FxHashSet<&Utf8Path>>::default();
     for (i, path1) in paths[..paths.len()].iter().enumerate() {
         let path1 = path1.as_ref();
         if path1.is_relative() {

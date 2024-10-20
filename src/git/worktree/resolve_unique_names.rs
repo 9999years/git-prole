@@ -2,8 +2,8 @@ use std::borrow::Cow;
 
 use camino::Utf8Path;
 use camino::Utf8PathBuf;
-use rustc_hash::FxHashMap as HashMap;
-use rustc_hash::FxHashSet as HashSet;
+use rustc_hash::FxHashMap;
+use rustc_hash::FxHashSet;
 use tracing::instrument;
 
 use crate::git::GitLike;
@@ -20,12 +20,12 @@ pub struct ResolveUniqueNameOpts<'a> {
     /// The worktrees to resolve into unique names.
     pub worktrees: Worktrees,
     /// A starting set of unique names that the resolved names will not conflict with.
-    pub names: HashSet<String>,
+    pub names: FxHashSet<String>,
     /// A set of directory names that the resolved names will not include.
     ///
     /// This is used to prevent worktree paths like `my-repo/my-repo` for detached `HEAD`
     /// worktrees.
-    pub directory_names: &'a HashSet<&'a str>,
+    pub directory_names: &'a FxHashSet<&'a str>,
 }
 
 /// When we convert a repository into a worktree checkout, we put all the worktrees in one
@@ -49,7 +49,7 @@ pub struct ResolveUniqueNameOpts<'a> {
 pub fn resolve_unique_worktree_names<C>(
     git: &AppGit<'_, C>,
     mut opts: ResolveUniqueNameOpts<'_>,
-) -> miette::Result<HashMap<Utf8PathBuf, RenamedWorktree>>
+) -> miette::Result<FxHashMap<Utf8PathBuf, RenamedWorktree>>
 where
     C: AsRef<Utf8Path>,
 {
@@ -79,13 +79,13 @@ where
 ///
 /// Returns the set of resolved names and the remaining worktrees.
 fn handle_bare_main_worktree(
-    names: &mut HashSet<String>,
+    names: &mut FxHashSet<String>,
     mut worktrees: Worktrees,
 ) -> (
-    HashMap<Utf8PathBuf, RenamedWorktree>,
-    HashMap<Utf8PathBuf, Worktree>,
+    FxHashMap<Utf8PathBuf, RenamedWorktree>,
+    FxHashMap<Utf8PathBuf, Worktree>,
 ) {
-    let mut resolved = HashMap::default();
+    let mut resolved = FxHashMap::default();
     debug_assert!(
         !names.contains(".git"),
         "`.git` cannot be a reserved worktree name"
@@ -127,7 +127,7 @@ pub struct RenamedWorktree {
 struct WorktreeNames<'a, C> {
     git: &'a AppGit<'a, C>,
     worktree: &'a Worktree,
-    directory_names: &'a HashSet<&'a str>,
+    directory_names: &'a FxHashSet<&'a str>,
 }
 
 impl<'a, C> WorktreeNames<'a, C>
@@ -137,7 +137,7 @@ where
     fn new(
         git: &'a AppGit<'a, C>,
         worktree: &'a Worktree,
-        directory_names: &'a HashSet<&'a str>,
+        directory_names: &'a FxHashSet<&'a str>,
     ) -> Self {
         Self {
             git,
@@ -246,7 +246,7 @@ mod tests {
                     .worktrees
                     .into_iter()
                     .map(|worktree| (worktree.path.clone(), worktree))
-                    .collect::<HashMap<_, _>>(),
+                    .collect::<FxHashMap<_, _>>(),
             };
 
             let mut worktrees = resolve_unique_worktree_names(

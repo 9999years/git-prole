@@ -8,7 +8,7 @@ use miette::miette;
 use miette::IntoDiagnostic;
 use owo_colors::OwoColorize;
 use owo_colors::Stream;
-use rustc_hash::FxHashSet as HashSet;
+use rustc_hash::FxHashSet;
 use tracing::instrument;
 
 use crate::app_git::AppGit;
@@ -303,7 +303,7 @@ where
                 .iter()
                 .map(|plan| plan.name.to_owned())
                 .collect(),
-            directory_names: &HashSet::from_iter([destination_name]),
+            directory_names: &FxHashSet::from_iter([destination_name]),
         })?;
 
         tracing::debug!(
