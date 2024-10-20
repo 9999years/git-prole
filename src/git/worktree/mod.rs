@@ -8,7 +8,7 @@ use command_error::CommandExt;
 use command_error::OutputContext;
 use miette::miette;
 use miette::Context;
-use rustc_hash::FxHashMap as HashMap;
+use rustc_hash::FxHashMap;
 use tap::Tap;
 use tracing::instrument;
 use utf8_command::Utf8Output;
@@ -275,7 +275,7 @@ where
     pub fn resolve_unique_names(
         &self,
         opts: ResolveUniqueNameOpts<'_>,
-    ) -> miette::Result<HashMap<Utf8PathBuf, RenamedWorktree>> {
+    ) -> miette::Result<FxHashMap<Utf8PathBuf, RenamedWorktree>> {
         resolve_unique_names::resolve_unique_worktree_names(self.0, opts)
     }
 

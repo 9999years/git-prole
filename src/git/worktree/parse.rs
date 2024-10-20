@@ -6,7 +6,7 @@ use camino::Utf8PathBuf;
 use miette::miette;
 use owo_colors::OwoColorize;
 use owo_colors::Stream;
-use rustc_hash::FxHashMap as HashMap;
+use rustc_hash::FxHashMap;
 use winnow::combinator::alt;
 use winnow::combinator::cut_err;
 use winnow::combinator::eof;
@@ -37,7 +37,7 @@ pub struct Worktrees {
     /// case of a bare repository, _is_ a `.git` directory.
     pub(crate) main: Utf8PathBuf,
     /// A map from worktree paths to worktree information.
-    pub(crate) inner: HashMap<Utf8PathBuf, Worktree>,
+    pub(crate) inner: FxHashMap<Utf8PathBuf, Worktree>,
 }
 
 impl Worktrees {
@@ -53,7 +53,7 @@ impl Worktrees {
         self.inner.remove(&self.main).unwrap()
     }
 
-    pub fn into_inner(self) -> HashMap<Utf8PathBuf, Worktree> {
+    pub fn into_inner(self) -> FxHashMap<Utf8PathBuf, Worktree> {
         self.inner
     }
 
@@ -68,7 +68,7 @@ impl Worktrees {
         main.is_main = true;
         let main_path = main.path.clone();
 
-        let mut inner: HashMap<_, _> = repeat_till(
+        let mut inner: FxHashMap<_, _> = repeat_till(
             0..,
             Worktree::parser.map(|worktree| (worktree.path.clone(), worktree)),
             eof,
@@ -122,7 +122,7 @@ impl Worktrees {
 }
 
 impl Deref for Worktrees {
-    type Target = HashMap<Utf8PathBuf, Worktree>;
+    type Target = FxHashMap<Utf8PathBuf, Worktree>;
 
     fn deref(&self) -> &Self::Target {
         &self.inner

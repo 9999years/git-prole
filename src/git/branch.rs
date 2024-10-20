@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use camino::Utf8Path;
 use command_error::CommandExt;
 use command_error::OutputContext;
-use rustc_hash::FxHashSet as HashSet;
+use rustc_hash::FxHashSet;
 use tracing::instrument;
 use utf8_command::Utf8Output;
 
@@ -38,24 +38,24 @@ where
 
     /// Lists local branches.
     #[instrument(level = "trace")]
-    pub fn list_local(&self) -> miette::Result<HashSet<LocalBranchRef>> {
+    pub fn list_local(&self) -> miette::Result<FxHashSet<LocalBranchRef>> {
         self.0
             .refs()
             .for_each_ref(Some(&["refs/heads/**"]))?
             .into_iter()
             .map(LocalBranchRef::try_from)
-            .collect::<Result<HashSet<_>, _>>()
+            .collect::<Result<FxHashSet<_>, _>>()
     }
 
     /// Lists local and remote branches.
     #[instrument(level = "trace")]
-    pub fn list(&self) -> miette::Result<HashSet<BranchRef>> {
+    pub fn list(&self) -> miette::Result<FxHashSet<BranchRef>> {
         self.0
             .refs()
             .for_each_ref(Some(&["refs/heads/**", "refs/remotes/**"]))?
             .into_iter()
             .map(BranchRef::try_from)
-            .collect::<Result<HashSet<_>, _>>()
+            .collect::<Result<FxHashSet<_>, _>>()
     }
 
     /// Does a local branch exist?
