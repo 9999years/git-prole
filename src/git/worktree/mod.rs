@@ -137,6 +137,10 @@ impl<'a> GitWorktree<'a> {
         let mut command = self.0.command();
         command.args(["worktree", "add"]);
 
+        if options.detach {
+            command.arg("--detach");
+        }
+
         if let Some(branch) = options.create_branch {
             command.arg(if options.force_branch { "-B" } else { "-b" });
             command.arg(branch.branch_name());
@@ -239,6 +243,9 @@ pub struct AddWorktreeOpts<'a> {
     pub track: bool,
     /// The start point for the new worktree.
     pub start_point: Option<&'a str>,
+    /// If true, use `--detach`.
+    /// Default false.
+    pub detach: bool,
 }
 
 impl<'a> Default for AddWorktreeOpts<'a> {
@@ -250,6 +257,7 @@ impl<'a> Default for AddWorktreeOpts<'a> {
             guess_remote: false,
             track: false,
             start_point: None,
+            detach: false,
         }
     }
 }
