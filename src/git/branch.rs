@@ -1,10 +1,13 @@
 use std::fmt::Debug;
 
+use camino::Utf8Path;
 use command_error::CommandExt;
 use command_error::OutputContext;
 use rustc_hash::FxHashSet as HashSet;
 use tracing::instrument;
 use utf8_command::Utf8Output;
+
+use crate::AppGit;
 
 use super::BranchRef;
 use super::GitLike;
@@ -97,5 +100,38 @@ where
             // NOTE: `branch` may not exist at all!
             None => Ok(None),
         }
+    }
+}
+
+impl<'a, C> GitBranch<'a, AppGit<'a, C>>
+where
+    C: AsRef<Utf8Path>,
+{
+    /// Get the user's preferred default branch.
+    #[instrument(level = "trace")]
+    pub fn preferred(&self) -> miette::Result<Option<BranchRef>> {
+        if let Some(default_remote) = self.0.remote().preferred()? {
+            return self
+                .0
+                .remote()
+                .default_branch(&default_remote)
+                .map(BranchRef::from)
+                .map(Some);
+        }
+
+        let preferred_branches = self.0.config.file.default_branches();
+        let all_branches = self.0.branch().list_local()?;
+        for preferred_branch in preferred_branches {
+            let preferred_branch = LocalBranchRef::new(preferred_branch);
+            if all_branches.contains(&preferred_branch) {
+                return Ok(Some(preferred_branch.into()));
+            } else if let Some(remote_branch) =
+                self.0.remote().for_branch(preferred_branch.branch_name())?
+            {
+                return Ok(Some(remote_branch.into()));
+            }
+        }
+
+        Ok(None)
     }
 }

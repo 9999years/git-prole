@@ -48,7 +48,7 @@ impl<'a> WorktreePlan<'a> {
         // - `add_from_container`
         // - `add_from_bare_no_worktrees`
         // - `add_from_container_no_default_branch`
-        let worktree = git.some_worktree()?;
+        let worktree = git.worktree().find_some()?;
 
         let git = git.with_current_dir(worktree);
         let branch = BranchStartPointPlan::new(&git, args)?;
@@ -276,9 +276,9 @@ impl StartPoint {
     }
 
     pub fn preferred(git: &AppGit<'_, Utf8PathBuf>) -> miette::Result<Self> {
-        Ok(Self::Branch(git.preferred_branch()?.ok_or_else(|| {
-            miette!("No default branch found; pass a COMMITISH to start the new worktree at")
-        })?))
+        Ok(Self::Branch(git.branch().preferred()?.ok_or_else(
+            || miette!("No default branch found; pass a COMMITISH to start the new worktree at"),
+        )?))
     }
 
     pub fn commitish(&self) -> &str {

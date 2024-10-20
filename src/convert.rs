@@ -238,7 +238,7 @@ where
                 .rev_parse_symbolic_full_name(&default_branch)?
                 .ok_or_else(|| miette!("`--default-branch` not found: {default_branch}"))?
                 .try_into()?,
-            None => git.preferred_branch()?.ok_or_else(|| {
+            None => git.branch().preferred()?.ok_or_else(|| {
                 miette!("No default branch found; specify a `--default-branch` to check out")
             })?,
         };
