@@ -1,5 +1,6 @@
 use command_error::CommandExt;
 use expect_test::expect;
+use git_prole::GitLike;
 use git_prole::HeadKind;
 use pretty_assertions::assert_eq;
 use test_harness::GitProle;

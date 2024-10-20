@@ -6,20 +6,28 @@ use miette::miette;
 use tracing::instrument;
 use utf8_command::Utf8Output;
 
-use super::Git;
+use super::GitLike;
 
 /// Git methods for dealing with config.
 #[repr(transparent)]
-pub struct GitConfig<'a>(&'a Git);
+pub struct GitConfig<'a, G>(&'a G);
 
-impl Debug for GitConfig<'_> {
+impl<G> Debug for GitConfig<'_, G>
+where
+    G: GitLike,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Debug::fmt(self.0, f)
+        f.debug_tuple("GitConfig")
+            .field(&self.0.get_current_dir().as_ref())
+            .finish()
     }
 }
 
-impl<'a> GitConfig<'a> {
-    pub fn new(git: &'a Git) -> Self {
+impl<'a, G> GitConfig<'a, G>
+where
+    G: GitLike,
+{
+    pub fn new(git: &'a G) -> Self {
         Self(git)
     }
 

@@ -7,20 +7,28 @@ use tracing::instrument;
 
 use crate::PathDisplay;
 
-use super::Git;
+use super::GitLike;
 
 /// Git methods for dealing with paths.
 #[repr(transparent)]
-pub struct GitPath<'a>(&'a Git);
+pub struct GitPath<'a, G>(&'a G);
 
-impl Debug for GitPath<'_> {
+impl<G> Debug for GitPath<'_, G>
+where
+    G: GitLike,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Debug::fmt(self.0, f)
+        f.debug_tuple("GitPath")
+            .field(&self.0.get_current_dir().as_ref())
+            .finish()
     }
 }
 
-impl<'a> GitPath<'a> {
-    pub fn new(git: &'a Git) -> Self {
+impl<'a, G> GitPath<'a, G>
+where
+    G: GitLike,
+{
+    pub fn new(git: &'a G) -> Self {
         Self(git)
     }
 
@@ -35,7 +43,7 @@ impl<'a> GitPath<'a> {
         } else {
             Err(miette!(
                 "Path is not in a working tree or a bare repository: {}",
-                self.0.get_directory().display_path_cwd()
+                self.0.get_current_dir().as_ref().display_path_cwd()
             ))
         }
     }
@@ -45,6 +53,7 @@ impl<'a> GitPath<'a> {
     pub(crate) fn get_git_dir(&self) -> miette::Result<Utf8PathBuf> {
         Ok(self
             .0
+            .as_git()
             .rev_parse_command()
             .arg("--git-dir")
             .output_checked_utf8()
@@ -56,6 +65,7 @@ impl<'a> GitPath<'a> {
     pub fn git_common_dir(&self) -> miette::Result<Utf8PathBuf> {
         Ok(self
             .0
+            .as_git()
             .rev_parse_command()
             .arg("--git-common-dir")
             .output_checked_utf8()

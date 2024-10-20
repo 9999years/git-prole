@@ -18,20 +18,28 @@ use winnow::Parser;
 
 use crate::parse::till_null;
 
-use super::Git;
+use super::GitLike;
 
 /// Git methods for dealing with statuses and the working tree.
 #[repr(transparent)]
-pub struct GitStatus<'a>(&'a Git);
+pub struct GitStatus<'a, G>(&'a G);
 
-impl Debug for GitStatus<'_> {
+impl<G> Debug for GitStatus<'_, G>
+where
+    G: GitLike,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Debug::fmt(self.0, f)
+        f.debug_tuple("GitStatus")
+            .field(&self.0.get_current_dir().as_ref())
+            .finish()
     }
 }
 
-impl<'a> GitStatus<'a> {
-    pub fn new(git: &'a Git) -> Self {
+impl<'a, G> GitStatus<'a, G>
+where
+    G: GitLike,
+{
+    pub fn new(git: &'a G) -> Self {
         Self(git)
     }
 

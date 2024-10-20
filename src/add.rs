@@ -18,7 +18,7 @@ use crate::app_git::AppGit;
 use crate::cli::AddArgs;
 use crate::format_bulleted_list::format_bulleted_list;
 use crate::git::BranchRef;
-use crate::git::Git;
+use crate::git::GitLike;
 use crate::git::LocalBranchRef;
 use crate::AddWorktreeOpts;
 use crate::PathDisplay;
@@ -27,7 +27,7 @@ use crate::Utf8Absolutize;
 /// A plan for creating a new `git worktree`.
 #[derive(Debug, Clone)]
 pub struct WorktreePlan<'a> {
-    git: AppGit<'a>,
+    git: AppGit<'a, Utf8PathBuf>,
     destination: Utf8PathBuf,
     branch: BranchStartPointPlan,
     /// Relative paths to copy to the new worktree, if any.
@@ -36,7 +36,10 @@ pub struct WorktreePlan<'a> {
 
 impl<'a> WorktreePlan<'a> {
     #[instrument(level = "trace")]
-    pub fn new(git: AppGit<'a>, args: &'a AddArgs) -> miette::Result<Self> {
+    pub fn new<C>(git: AppGit<'a, C>, args: &'a AddArgs) -> miette::Result<Self>
+    where
+        C: AsRef<Utf8Path>,
+    {
         // TODO: Check if there's more than 1 worktree and (offer to?) convert if not?
         // TODO: Allow user to run commands, e.g. `direnv allow`?
 
@@ -47,7 +50,7 @@ impl<'a> WorktreePlan<'a> {
         // - `add_from_container_no_default_branch`
         let worktree = git.some_worktree()?;
 
-        let git = git.with_directory(worktree);
+        let git = git.with_current_dir(worktree);
         let branch = BranchStartPointPlan::new(&git, args)?;
         let destination = Self::destination_plan(&git, args, &branch)?;
         let copy_untracked = Self::untracked_plan(&git)?;
@@ -60,7 +63,7 @@ impl<'a> WorktreePlan<'a> {
     }
 
     #[instrument(level = "trace")]
-    fn untracked_plan(git: &AppGit<'_>) -> miette::Result<Vec<Utf8PathBuf>> {
+    fn untracked_plan(git: &AppGit<'_, Utf8PathBuf>) -> miette::Result<Vec<Utf8PathBuf>> {
         if git.config.file.copy_untracked() && git.worktree().is_inside()? {
             git.status().untracked_files()
         } else {
@@ -70,7 +73,7 @@ impl<'a> WorktreePlan<'a> {
 
     #[instrument(level = "trace")]
     fn destination_plan(
-        git: &AppGit<'_>,
+        git: &AppGit<'_, Utf8PathBuf>,
         args: &AddArgs,
         branch: &BranchStartPointPlan,
     ) -> miette::Result<Utf8PathBuf> {
@@ -101,7 +104,7 @@ impl<'a> WorktreePlan<'a> {
         })
     }
 
-    fn command(&self, git: &Git) -> Command {
+    fn command(&self) -> Command {
         let (force_branch, track, create_branch) = match &self.branch {
             BranchStartPointPlan::New {
                 force,
@@ -117,7 +120,7 @@ impl<'a> WorktreePlan<'a> {
             }
         };
 
-        git.worktree().add_command(
+        self.git.worktree().add_command(
             // TODO: What if the destination already exists?
             &self.destination,
             &AddWorktreeOpts {
@@ -145,7 +148,7 @@ impl<'a> WorktreePlan<'a> {
             self.destination.display_path_cwd()
         );
         for path in &self.copy_untracked {
-            let from = self.git.get_directory().join(path);
+            let from = self.git.get_current_dir().join(path);
             let to = self.destination.join(path);
             tracing::trace!(
                 %path,
@@ -167,7 +170,7 @@ impl<'a> WorktreePlan<'a> {
 
     #[instrument(level = "trace")]
     pub fn execute(&self) -> miette::Result<()> {
-        let mut command = self.command(&self.git);
+        let mut command = self.command();
 
         tracing::info!("{self}");
         tracing::debug!("{self:#?}");
@@ -262,7 +265,7 @@ impl Display for StartPoint {
 }
 
 impl StartPoint {
-    pub fn new(git: &AppGit<'_>, commitish: Option<&str>) -> miette::Result<Self> {
+    pub fn new(git: &AppGit<'_, Utf8PathBuf>, commitish: Option<&str>) -> miette::Result<Self> {
         match commitish {
             Some(commitish) => match git.branch().local_or_remote(commitish)? {
                 Some(branch) => Ok(Self::Branch(branch)),
@@ -272,7 +275,7 @@ impl StartPoint {
         }
     }
 
-    pub fn preferred(git: &AppGit) -> miette::Result<Self> {
+    pub fn preferred(git: &AppGit<'_, Utf8PathBuf>) -> miette::Result<Self> {
         Ok(Self::Branch(git.preferred_branch()?.ok_or_else(|| {
             miette!("No default branch found; pass a COMMITISH to start the new worktree at")
         })?))
@@ -340,7 +343,7 @@ impl BranchStartPointPlan {
     ///
     /// This was very annoying to iron out, but hopefully it does what you want more of the time
     /// than `git-worktree(1)`.
-    pub fn new(git: &AppGit<'_>, args: &AddArgs) -> miette::Result<Self> {
+    pub fn new(git: &AppGit<'_, Utf8PathBuf>, args: &AddArgs) -> miette::Result<Self> {
         match (&args.inner.branch, &args.inner.force_branch) {
             (Some(_), Some(_)) => unreachable!(),
             // `add --branch BRANCH [NAME_OR_PATH [COMMITISH]]`
@@ -391,7 +394,7 @@ impl BranchStartPointPlan {
     }
 
     fn new_branch_at(
-        git: &AppGit<'_>,
+        git: &AppGit<'_, Utf8PathBuf>,
         force: bool,
         branch: &str,
         commitish: Option<&str>,
@@ -403,11 +406,17 @@ impl BranchStartPointPlan {
         })
     }
 
-    fn new_detached(git: &AppGit<'_>, commitish: Option<&str>) -> miette::Result<Self> {
+    fn new_detached(
+        git: &AppGit<'_, Utf8PathBuf>,
+        commitish: Option<&str>,
+    ) -> miette::Result<Self> {
         Ok(Self::Detach(StartPoint::new(git, commitish)?))
     }
 
-    fn from_commitish(git: &AppGit<'_>, commitish: &str) -> miette::Result<Option<Self>> {
+    fn from_commitish(
+        git: &AppGit<'_, Utf8PathBuf>,
+        commitish: &str,
+    ) -> miette::Result<Option<Self>> {
         Ok(git
             .branch()
             .local_or_remote(commitish)?

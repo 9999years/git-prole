@@ -127,7 +127,7 @@ impl GitProle {
     }
 
     #[track_caller]
-    pub fn git(&self, directory: &str) -> Git {
+    pub fn git(&self, directory: &str) -> Git<Utf8PathBuf> {
         let path = self.path(directory);
         if !path.exists() {
             panic!("A test requested a Git interface for a nonexistent path: {directory}");

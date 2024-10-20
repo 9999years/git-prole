@@ -13,7 +13,9 @@ use tap::Tap;
 use tracing::instrument;
 use utf8_command::Utf8Output;
 
-use super::Git;
+use crate::AppGit;
+
+use super::GitLike;
 use super::LocalBranchRef;
 
 mod resolve_unique_names;
@@ -28,16 +30,24 @@ pub use resolve_unique_names::ResolveUniqueNameOpts;
 
 /// Git methods for dealing with worktrees.
 #[repr(transparent)]
-pub struct GitWorktree<'a>(&'a Git);
+pub struct GitWorktree<'a, G>(&'a G);
 
-impl Debug for GitWorktree<'_> {
+impl<G> Debug for GitWorktree<'_, G>
+where
+    G: GitLike,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Debug::fmt(self.0, f)
+        f.debug_tuple("GitWorktree")
+            .field(&self.0.get_current_dir().as_ref())
+            .finish()
     }
 }
 
-impl<'a> GitWorktree<'a> {
-    pub fn new(git: &'a Git) -> Self {
+impl<'a, G> GitWorktree<'a, G>
+where
+    G: GitLike,
+{
+    pub fn new(git: &'a G) -> Self {
         Self(git)
     }
 
@@ -78,7 +88,7 @@ impl<'a> GitWorktree<'a> {
                     Err(context.error())
                 } else {
                     let output = &context.output().stdout;
-                    match Worktrees::parse(self.0, output) {
+                    match Worktrees::parse(self.0.as_git(), output) {
                         Ok(worktrees) => Ok(worktrees),
                         Err(err) => {
                             let err = miette!("{err}");
@@ -96,6 +106,7 @@ impl<'a> GitWorktree<'a> {
     pub fn is_inside(&self) -> miette::Result<bool> {
         Ok(self
             .0
+            .as_git()
             .rev_parse_command()
             .arg("--is-inside-work-tree")
             .output_checked_as(|context: OutputContext<Utf8Output>| {
@@ -117,6 +128,7 @@ impl<'a> GitWorktree<'a> {
     pub fn root(&self) -> miette::Result<Utf8PathBuf> {
         Ok(self
             .0
+            .as_git()
             .rev_parse_command()
             .arg("--show-toplevel")
             .output_checked_utf8()
@@ -189,39 +201,6 @@ impl<'a> GitWorktree<'a> {
             .output_checked_utf8()?;
         Ok(())
     }
-
-    /// The directory name, nested under the worktree parent directory, where the given
-    /// branch's worktree will be placed.
-    ///
-    /// E.g. to convert a repo `~/puppy` with default branch `main`, this will return `main`,
-    /// to indicate a worktree to be placed in `~/puppy/main`.
-    ///
-    /// TODO: Should support some configurable regex filtering or other logic?
-    pub fn dirname_for<'b>(&self, branch: &'b str) -> &'b str {
-        match branch.rsplit_once('/') {
-            Some((_left, right)) => right,
-            None => branch,
-        }
-    }
-
-    /// Get the full path for a new worktree with the given branch name.
-    ///
-    /// This appends the [`Self::dirname_for`] to the [`Self::container`].
-    #[instrument(level = "trace")]
-    pub fn path_for(&self, branch: &str) -> miette::Result<Utf8PathBuf> {
-        Ok(self
-            .container()?
-            .tap_mut(|p| p.push(self.dirname_for(branch))))
-    }
-
-    /// Resolves a set of worktrees into a map from worktree paths to unique names.
-    #[instrument(level = "trace")]
-    pub fn resolve_unique_names(
-        &self,
-        opts: ResolveUniqueNameOpts<'_>,
-    ) -> miette::Result<HashMap<Utf8PathBuf, RenamedWorktree>> {
-        resolve_unique_names::resolve_unique_worktree_names(self.0, opts)
-    }
 }
 
 /// Options for `git worktree add`.
@@ -259,5 +238,43 @@ impl<'a> Default for AddWorktreeOpts<'a> {
             start_point: None,
             detach: false,
         }
+    }
+}
+
+impl<'a, C> GitWorktree<'a, AppGit<'a, C>>
+where
+    C: AsRef<Utf8Path>,
+{
+    /// The directory name, nested under the worktree parent directory, where the given
+    /// branch's worktree will be placed.
+    ///
+    /// E.g. to convert a repo `~/puppy` with default branch `main`, this will return `main`,
+    /// to indicate a worktree to be placed in `~/puppy/main`.
+    ///
+    /// TODO: Should support some configurable regex filtering or other logic?
+    pub fn dirname_for<'b>(&self, branch: &'b str) -> &'b str {
+        match branch.rsplit_once('/') {
+            Some((_left, right)) => right,
+            None => branch,
+        }
+    }
+
+    /// Get the full path for a new worktree with the given branch name.
+    ///
+    /// This appends the [`Self::dirname_for`] to the [`Self::container`].
+    #[instrument(level = "trace")]
+    pub fn path_for(&self, branch: &str) -> miette::Result<Utf8PathBuf> {
+        Ok(self
+            .container()?
+            .tap_mut(|p| p.push(self.dirname_for(branch))))
+    }
+
+    /// Resolves a set of worktrees into a map from worktree paths to unique names.
+    #[instrument(level = "trace")]
+    pub fn resolve_unique_names(
+        &self,
+        opts: ResolveUniqueNameOpts<'_>,
+    ) -> miette::Result<HashMap<Utf8PathBuf, RenamedWorktree>> {
+        resolve_unique_names::resolve_unique_worktree_names(self.0, opts)
     }
 }

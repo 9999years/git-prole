@@ -20,9 +20,9 @@ use winnow::stream::Stream as _;
 use winnow::PResult;
 use winnow::Parser;
 
+use crate::git::GitLike;
 use crate::parse::till_null;
 use crate::CommitHash;
-use crate::Git;
 use crate::LocalBranchRef;
 use crate::PathDisplay;
 use crate::Ref;
@@ -91,7 +91,7 @@ impl Worktrees {
         Ok(worktrees)
     }
 
-    pub fn parse(git: &Git, input: &str) -> miette::Result<Self> {
+    pub fn parse(git: &impl GitLike, input: &str) -> miette::Result<Self> {
         let mut ret = Self::parser.parse(input).map_err(|err| miette!("{err}"))?;
 
         if ret.main().head.is_bare() {
