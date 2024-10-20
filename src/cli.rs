@@ -135,7 +135,13 @@ pub struct AddArgsInner {
     ///
     /// This will refuse to reset a branch if it already exists; use `--force-branch`/`-B` to
     /// reset existing branches.
-    #[arg(long, short = 'b', visible_alias = "create", visible_short_alias = 'c')]
+    #[arg(
+        long,
+        short = 'b',
+        visible_alias = "create",
+        visible_short_alias = 'c',
+        conflicts_with_all = ["force_branch", "detach"],
+    )]
     pub branch: Option<String>,
 
     /// Create a new branch with the given name, overwriting any existing branch with the same
@@ -144,9 +150,19 @@ pub struct AddArgsInner {
         long,
         short = 'B',
         visible_alias = "force-create",
-        visible_short_alias = 'C'
+        visible_short_alias = 'C',
+        conflicts_with_all = ["branch", "detach"],
     )]
     pub force_branch: Option<String>,
+
+    /// Create the new worktree in detached mode, not checked out on any branch.
+    #[arg(
+        long,
+        short = 'd',
+        alias = "detached",
+        conflicts_with_all = ["branch", "force_branch"],
+    )]
+    pub detach: bool,
 
     /// The new worktree's name or path.
     ///

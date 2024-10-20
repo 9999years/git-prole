@@ -49,7 +49,7 @@ impl<'a> WorktreePlan<'a> {
 
         let git = git.with_directory(worktree);
         let branch = BranchStartPointPlan::new(&git, args)?;
-        let destination = Self::destination_plan(&git, args, branch.local_branch())?;
+        let destination = Self::destination_plan(&git, args, &branch)?;
         let copy_untracked = Self::untracked_plan(&git)?;
         Ok(Self {
             git,
@@ -72,37 +72,37 @@ impl<'a> WorktreePlan<'a> {
     fn destination_plan(
         git: &AppGit<'_>,
         args: &AddArgs,
-        new_branch: &LocalBranchRef,
+        branch: &BranchStartPointPlan,
     ) -> miette::Result<Utf8PathBuf> {
-        match &args.inner.name_or_path {
+        Ok(match &args.inner.name_or_path {
             Some(name_or_path) => {
                 if name_or_path.contains('/') {
                     // Test case: `add_by_path`.
                     Utf8Path::new(name_or_path)
                         .absolutize()
                         .map(Cow::into_owned)
+                        .into_diagnostic()?
                 } else {
                     // Test case: `add_by_name_new_local`.
                     git.worktree()
                         .container()?
                         .tap_mut(|p| p.push(name_or_path))
-                        .absolutize()
-                        .map(Cow::into_owned)
                 }
             }
-            // Test case: `add_branch_new_local`.
-            None => git
-                .worktree()
-                .path_for(new_branch.branch_name())?
-                .absolutize()
-                .map(Cow::into_owned),
-        }
-        .into_diagnostic()
+            None => {
+                let name = match branch {
+                    BranchStartPointPlan::New { branch, .. }
+                    | BranchStartPointPlan::Existing(branch) => branch.branch_name(),
+                    BranchStartPointPlan::Detach(start) => start.commitish(),
+                };
+                // Test case: `add_branch_new_local`.
+                git.worktree().path_for(name)?
+            }
+        })
     }
 
     fn command(&self, git: &Git) -> Command {
         let (force_branch, track, create_branch) = match &self.branch {
-            BranchStartPointPlan::Existing(_) => (false, false, None),
             BranchStartPointPlan::New {
                 force,
                 branch,
@@ -112,9 +112,13 @@ impl<'a> WorktreePlan<'a> {
 
                 (*force, track, Some(branch))
             }
+            BranchStartPointPlan::Detach(_) | BranchStartPointPlan::Existing(_) => {
+                (false, false, None)
+            }
         };
 
         git.worktree().add_command(
+            // TODO: What if the destination already exists?
             &self.destination,
             &AddWorktreeOpts {
                 force_branch,
@@ -122,11 +126,10 @@ impl<'a> WorktreePlan<'a> {
                 track,
                 start_point: Some(match &self.branch {
                     BranchStartPointPlan::Existing(branch) => branch.branch_name(),
-                    BranchStartPointPlan::New { start, .. } => match start {
-                        StartPoint::Branch(start) => start.qualified_branch_name(),
-                        StartPoint::Commitish(commitish) => commitish,
-                    },
+                    BranchStartPointPlan::New { start, .. } => start.commitish(),
+                    BranchStartPointPlan::Detach(start) => start.commitish(),
                 }),
+                detach: matches!(self.branch, BranchStartPointPlan::Detach(_)),
                 ..Default::default()
             },
         )
@@ -209,7 +212,7 @@ impl Display for WorktreePlan<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Creating worktree in {} for {}",
+            "Creating worktree in {} {}",
             self.destination.display_path_cwd(),
             self.branch,
         )?;
@@ -235,6 +238,29 @@ enum StartPoint {
     Commitish(String),
 }
 
+impl Display for StartPoint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            StartPoint::Branch(tracking) => {
+                write!(
+                    f,
+                    "{}",
+                    tracking
+                        .qualified_branch_name()
+                        .if_supports_color(Stream::Stdout, |text| text.cyan())
+                )
+            }
+            StartPoint::Commitish(commitish) => {
+                write!(
+                    f,
+                    "{}",
+                    commitish.if_supports_color(Stream::Stdout, |text| text.cyan())
+                )
+            }
+        }
+    }
+}
+
 impl StartPoint {
     pub fn new(git: &AppGit<'_>, commitish: Option<&str>) -> miette::Result<Self> {
         match commitish {
@@ -250,6 +276,13 @@ impl StartPoint {
         Ok(Self::Branch(git.preferred_branch()?.ok_or_else(|| {
             miette!("No default branch found; pass a COMMITISH to start the new worktree at")
         })?))
+    }
+
+    pub fn commitish(&self) -> &str {
+        match self {
+            Self::Branch(start) => start.qualified_branch_name(),
+            Self::Commitish(commitish) => commitish,
+        }
     }
 }
 
@@ -272,6 +305,8 @@ enum BranchStartPointPlan {
     },
     /// Check out an existing branch.
     Existing(LocalBranchRef),
+    /// Create a new detached worktree.
+    Detach(StartPoint),
 }
 
 impl BranchStartPointPlan {
@@ -307,9 +342,7 @@ impl BranchStartPointPlan {
     /// than `git-worktree(1)`.
     pub fn new(git: &AppGit<'_>, args: &AddArgs) -> miette::Result<Self> {
         match (&args.inner.branch, &args.inner.force_branch) {
-            (Some(_), Some(_)) => Err(miette!(
-                "`--branch` and `--force-branch` are mutually exclusive."
-            )),
+            (Some(_), Some(_)) => unreachable!(),
             // `add --branch BRANCH [NAME_OR_PATH [COMMITISH]]`
             (Some(branch), None) => Ok(Self::New {
                 force: false,
@@ -323,30 +356,35 @@ impl BranchStartPointPlan {
                 start: StartPoint::new(git, args.commitish.as_deref())?,
             }),
             (None, None) => {
-                let name_or_path = args
-                    .inner
-                    .name_or_path
-                    .as_deref()
-                    .expect("If `--branch` is not given, `NAME_OR_PATH` must be given");
-                let dirname = git.worktree().dirname_for(name_or_path);
+                if args.inner.detach {
+                    // `add --detach NAME_OR_PATH [COMMITISH]`
+                    Self::new_detached(git, args.commitish.as_deref())
+                } else {
+                    let name_or_path = args
+                        .inner
+                        .name_or_path
+                        .as_deref()
+                        .expect("If `--branch` is not given, `NAME_OR_PATH` must be given");
+                    let dirname = git.worktree().dirname_for(name_or_path);
 
-                match &args.commitish {
-                    Some(commitish) => match Self::from_commitish(git, commitish)? {
-                        // `add NAME_OR_PATH LOCAL_BRANCH`
-                        // `add NAME_OR_PATH REMOTE_BRANCH`
-                        Some(plan) => Ok(plan),
-                        // `add NAME_OR_PATH COMMITISH`
-                        None => Self::new_branch_at(git, false, dirname, Some(commitish)),
-                    },
+                    match &args.commitish {
+                        Some(commitish) => match Self::from_commitish(git, commitish)? {
+                            // `add NAME_OR_PATH LOCAL_BRANCH`
+                            // `add NAME_OR_PATH REMOTE_BRANCH`
+                            Some(plan) => Ok(plan),
+                            // `add NAME_OR_PATH COMMITISH`
+                            None => Self::new_branch_at(git, false, dirname, Some(commitish)),
+                        },
 
-                    // `add NAME_OR_PATH`
-                    None => match Self::from_commitish(git, dirname)? {
-                        // `add ../puppy/LOCAL_BRANCH`
-                        // `add ../puppy/REMOTE_BRANCH`
-                        Some(plan) => Ok(plan),
-                        // `add ../puppy/SOMETHING_ELSE`
-                        None => Self::new_branch_at(git, false, dirname, None),
-                    },
+                        // `add NAME_OR_PATH`
+                        None => match Self::from_commitish(git, dirname)? {
+                            // `add ../puppy/LOCAL_BRANCH`
+                            // `add ../puppy/REMOTE_BRANCH`
+                            Some(plan) => Ok(plan),
+                            // `add ../puppy/SOMETHING_ELSE`
+                            None => Self::new_branch_at(git, false, dirname, None),
+                        },
+                    }
                 }
             }
         }
@@ -363,6 +401,10 @@ impl BranchStartPointPlan {
             branch: LocalBranchRef::new(branch.to_owned()),
             start: StartPoint::new(git, commitish)?,
         })
+    }
+
+    fn new_detached(git: &AppGit<'_>, commitish: Option<&str>) -> miette::Result<Self> {
+        Ok(Self::Detach(StartPoint::new(git, commitish)?))
     }
 
     fn from_commitish(git: &AppGit<'_>, commitish: &str) -> miette::Result<Option<Self>> {
@@ -382,15 +424,6 @@ impl BranchStartPointPlan {
             },
         }
     }
-
-    /// The local branch that will be checked out or created.
-    pub fn local_branch(&self) -> &LocalBranchRef {
-        match self {
-            BranchStartPointPlan::New { branch, .. } | BranchStartPointPlan::Existing(branch) => {
-                branch
-            }
-        }
-    }
 }
 
 impl Display for BranchStartPointPlan {
@@ -399,7 +432,7 @@ impl Display for BranchStartPointPlan {
             BranchStartPointPlan::Existing(branch) => {
                 write!(
                     f,
-                    "{}",
+                    "for {}",
                     branch
                         .branch_name()
                         .if_supports_color(Stream::Stdout, |text| text.cyan())
@@ -412,29 +445,22 @@ impl Display for BranchStartPointPlan {
             } => {
                 write!(
                     f,
-                    "{}",
+                    "for {}",
                     branch
                         .branch_name()
                         .if_supports_color(Stream::Stdout, |text| text.cyan())
                 )?;
                 match start {
-                    StartPoint::Branch(tracking) => {
-                        write!(
-                            f,
-                            " tracking {}",
-                            tracking
-                                .qualified_branch_name()
-                                .if_supports_color(Stream::Stdout, |text| text.cyan())
-                        )
+                    StartPoint::Branch(_) => {
+                        write!(f, " tracking {start}")
                     }
-                    StartPoint::Commitish(commitish) => {
-                        write!(
-                            f,
-                            " starting at {}",
-                            commitish.if_supports_color(Stream::Stdout, |text| text.cyan())
-                        )
+                    StartPoint::Commitish(_) => {
+                        write!(f, " starting at {start}")
                     }
                 }
+            }
+            BranchStartPointPlan::Detach(start) => {
+                write!(f, "detached starting at {start}")
             }
         }
     }
