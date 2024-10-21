@@ -28,16 +28,16 @@ jobs:
       - uses: DeterminateSystems/magic-nix-cache-action@v8
 
       - name: nix flake check
-        run: nix flake check --verbose --print-build-logs
+        run: nix flake check --print-build-logs
 
       - name: nix develop
-        run: nix develop --verbose --print-build-logs --command true
+        run: nix develop --print-build-logs --command true
 
       - name: nix build
-        run: nix build --verbose --print-build-logs
+        run: nix build --print-build-logs
 
       - name: nix build (misc)
         run: |
-          nix build --verbose --print-build-logs .#cargo
-          nix build --verbose --print-build-logs .#get-crate-version
-          nix build --verbose --print-build-logs .#make-release-commit
+          nix build --print-build-logs .#cargo
+          nix build --print-build-logs .#get-crate-version
+          nix build --print-build-logs .#make-release-commit
