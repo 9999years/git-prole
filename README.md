@@ -1,7 +1,17 @@
 # git-prole
 
-[![Crates.io](https://img.shields.io/crates/v/git-prole)](https://crates.io/crates/git-prole)
-[![Packaging status](https://repology.org/badge/vertical-allrepos/git-prole.svg?header=)](https://repology.org/project/git-prole/versions)
+<a href="https://crates.io/crates/git-prole">
+<img src="https://img.shields.io/crates/v/git-prole" alt="Crates.io">
+</a>
+<br>
+<a href="https://repology.org/project/git-prole/versions">
+<img src="https://repology.org/badge/vertical-allrepos/git-prole.svg?header=" alt="Packaging status">
+</a>
+<br>
+<a href="https://9999years.github.io/git-prole/">
+<img src="https://img.shields.io/badge/User%20manual-9999years.github.io%2Fgit--prole-blue" alt="User manual">
+</a>
+<br>
 
 A [`git-worktree(1)`][git-worktree] manager.
 
