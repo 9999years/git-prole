@@ -1,6 +1,7 @@
 # git-prole
 
 [![Crates.io](https://img.shields.io/crates/v/git-prole)](https://crates.io/crates/git-prole)
+[![Packaging status](https://repology.org/badge/vertical-allrepos/git-prole.svg?header=)](https://repology.org/project/git-prole/versions)
 
 A [`git-worktree(1)`][git-worktree] manager.
 
