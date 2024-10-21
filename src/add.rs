@@ -64,7 +64,7 @@ impl<'a> WorktreePlan<'a> {
 
     #[instrument(level = "trace")]
     fn untracked_plan(git: &AppGit<'_, Utf8PathBuf>) -> miette::Result<Vec<Utf8PathBuf>> {
-        if git.config.file.copy_untracked() && git.worktree().is_inside()? {
+        if git.config.file.add.copy_untracked() && git.worktree().is_inside()? {
             git.status().untracked_files()
         } else {
             Ok(Vec::new())
@@ -189,7 +189,7 @@ impl<'a> WorktreePlan<'a> {
 
     #[instrument(level = "trace")]
     fn run_commands(&self) -> miette::Result<()> {
-        for command in self.git.config.file.commands() {
+        for command in self.git.config.file.add.commands() {
             let mut command = command.as_command();
             let command_display = Utf8ProgramAndArgs::from(&command);
             tracing::info!(

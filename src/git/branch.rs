@@ -119,7 +119,7 @@ where
                 .map(Some);
         }
 
-        let preferred_branches = self.0.config.file.default_branches();
+        let preferred_branches = self.0.config.file.branch_names();
         let all_branches = self.0.branch().list_local()?;
         for preferred_branch in preferred_branches {
             let preferred_branch = LocalBranchRef::new(preferred_branch);

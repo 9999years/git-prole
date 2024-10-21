@@ -5,7 +5,7 @@ use test_harness::GitProle;
 use test_harness::WorktreeState;
 
 #[test]
-fn config_remotes_default() -> miette::Result<()> {
+fn config_remote_names_default() -> miette::Result<()> {
     let prole = GitProle::new()?;
     setup_repo_multiple_remotes(&prole, "my-remotes/my-repo", "my-repo")?;
 

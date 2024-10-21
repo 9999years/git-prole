@@ -3,24 +3,13 @@ use test_harness::GitProle;
 use test_harness::WorktreeState;
 
 #[test]
-fn config_branch_replacements_multiple() -> miette::Result<()> {
+fn config_add_branch_replacements_default() -> miette::Result<()> {
     let prole = GitProle::new()?;
     prole.setup_worktree_repo("my-repo")?;
-    prole.write_config(
-        r#"
-        [[branch_replacements]]
-        find = '''puppy'''
-        replace = '''doggy'''
-
-        [[branch_replacements]]
-        find = '''doggy'''
-        replace = '''cutie'''
-        "#,
-    )?;
 
     prole
         .cd_cmd("my-repo/main")
-        .args(["add", "-b", "silly-puppy"])
+        .args(["add", "-b", "doggy/puppy"])
         .status_checked()
         .unwrap();
 
@@ -29,8 +18,8 @@ fn config_branch_replacements_multiple() -> miette::Result<()> {
         .worktrees([
             WorktreeState::new_bare(),
             WorktreeState::new("main").branch("main"),
-            WorktreeState::new("silly-cutie")
-                .branch("silly-puppy")
+            WorktreeState::new("puppy")
+                .branch("doggy/puppy")
                 .upstream("main"),
         ])
         .assert();

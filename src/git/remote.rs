@@ -219,7 +219,7 @@ where
             }
         }
 
-        let preferred_remotes = self.0.config.file.remotes();
+        let preferred_remotes = self.0.config.file.remote_names();
         for remote in preferred_remotes {
             if let Some(remote) = all_remotes.take(&remote) {
                 sorted.push(remote);

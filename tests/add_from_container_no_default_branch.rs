@@ -10,7 +10,7 @@ fn add_from_container_no_default_branch() -> miette::Result<()> {
 
     prole.write_config(
         r#"
-        default_branches = []
+        branch_names = []
         "#,
     )?;
 

@@ -9,7 +9,7 @@ fn add_from_bare_no_worktrees() -> miette::Result<()> {
 
     prole.write_config(
         r#"
-        default_branches = []
+        branch_names = []
         "#,
     )?;
 

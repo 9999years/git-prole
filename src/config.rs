@@ -93,43 +93,59 @@ fn config_file_path(dirs: &BaseDirectories) -> miette::Result<Utf8PathBuf> {
 ///
 /// The default configuration file is accessible as [`Config::DEFAULT`].
 #[derive(Debug, Default, Deserialize, PartialEq, Eq)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct ConfigFile {
-    remotes: Vec<String>,
-    default_branches: Vec<String>,
-    copy_untracked: Option<bool>,
-    enable_gh: Option<bool>,
-    commands: Vec<ShellCommand>,
-    branch_replacements: Vec<BranchReplacement>,
+    remote_names: Vec<String>,
+    branch_names: Vec<String>,
+    pub clone: CloneConfig,
+    pub add: AddConfig,
 }
 
 impl ConfigFile {
     pub const FILE_NAME: &str = "config.toml";
 
-    pub fn remotes(&self) -> Vec<String> {
+    pub fn remote_names(&self) -> Vec<String> {
         // Yeah this basically sucks. But how big could these lists really be?
-        if self.remotes.is_empty() {
+        if self.remote_names.is_empty() {
             vec!["upstream".to_owned(), "origin".to_owned()]
         } else {
-            self.remotes.clone()
+            self.remote_names.clone()
         }
     }
 
-    pub fn default_branches(&self) -> Vec<String> {
+    pub fn branch_names(&self) -> Vec<String> {
         // Yeah this basically sucks. But how big could these lists really be?
-        if self.default_branches.is_empty() {
+        if self.branch_names.is_empty() {
             vec!["main".to_owned(), "master".to_owned(), "trunk".to_owned()]
         } else {
-            self.default_branches.clone()
+            self.branch_names.clone()
         }
     }
+}
 
-    pub fn copy_untracked(&self) -> bool {
-        self.copy_untracked.unwrap_or(true)
-    }
+#[derive(Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct CloneConfig {
+    enable_gh: Option<bool>,
+}
 
+impl CloneConfig {
     pub fn enable_gh(&self) -> bool {
         self.enable_gh.unwrap_or(false)
+    }
+}
+
+#[derive(Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct AddConfig {
+    copy_untracked: Option<bool>,
+    commands: Vec<ShellCommand>,
+    branch_replacements: Vec<BranchReplacement>,
+}
+
+impl AddConfig {
+    pub fn copy_untracked(&self) -> bool {
+        self.copy_untracked.unwrap_or(true)
     }
 
     pub fn commands(&self) -> &[ShellCommand] {
@@ -231,12 +247,16 @@ mod tests {
         assert_eq!(
             default_config,
             ConfigFile {
-                remotes: vec!["upstream".to_owned(), "origin".to_owned(),],
-                default_branches: vec!["main".to_owned(), "master".to_owned(), "trunk".to_owned(),],
-                copy_untracked: Some(true),
-                enable_gh: Some(false),
-                commands: vec![],
-                branch_replacements: vec![],
+                remote_names: vec!["upstream".to_owned(), "origin".to_owned(),],
+                branch_names: vec!["main".to_owned(), "master".to_owned(), "trunk".to_owned(),],
+                clone: CloneConfig {
+                    enable_gh: Some(false)
+                },
+                add: AddConfig {
+                    copy_untracked: Some(true),
+                    commands: vec![],
+                    branch_replacements: vec![],
+                }
             }
         );
 
@@ -244,20 +264,26 @@ mod tests {
         assert_eq!(
             default_config,
             ConfigFile {
-                remotes: empty_config.remotes(),
-                default_branches: empty_config.default_branches(),
-                copy_untracked: Some(empty_config.copy_untracked()),
-                enable_gh: Some(empty_config.enable_gh()),
-                commands: empty_config
-                    .commands()
-                    .iter()
-                    .map(|command| command.to_owned())
-                    .collect(),
-                branch_replacements: empty_config
-                    .branch_replacements()
-                    .iter()
-                    .map(|replacement| replacement.to_owned())
-                    .collect()
+                remote_names: empty_config.remote_names(),
+                branch_names: empty_config.branch_names(),
+                clone: CloneConfig {
+                    enable_gh: Some(empty_config.clone.enable_gh()),
+                },
+                add: AddConfig {
+                    copy_untracked: Some(empty_config.add.copy_untracked()),
+                    commands: empty_config
+                        .add
+                        .commands()
+                        .iter()
+                        .map(|command| command.to_owned())
+                        .collect(),
+                    branch_replacements: empty_config
+                        .add
+                        .branch_replacements()
+                        .iter()
+                        .map(|replacement| replacement.to_owned())
+                        .collect(),
+                },
             }
         );
     }
