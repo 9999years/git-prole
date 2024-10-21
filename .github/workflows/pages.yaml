@@ -11,8 +11,8 @@ on:
 name: Build and publish a release
 
 jobs:
-  github-pages:
-    name: Publish user manual to GitHub Pages
+  build:
+    name: Build user manual
     runs-on: ubuntu-latest
     steps:
       - uses: cachix/install-nix-action@v30
@@ -35,5 +35,19 @@ jobs:
         with:
           path: git-prole-user-manual/
 
+
+  deploy:
+    name: Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      pages: write      # to deploy to Pages
+      id-token: write   # to verify the deployment originates from an appropriate source
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - name: Deploy to GitHub Pages
+        id: deployment
         uses: actions/deploy-pages@v4
