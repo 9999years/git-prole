@@ -8,7 +8,7 @@ use crate::add::WorktreePlan;
 use crate::app_git::AppGit;
 use crate::cli;
 use crate::cli::ConfigCommand;
-use crate::cli::ConfigGenerateArgs;
+use crate::cli::ConfigInitArgs;
 use crate::config::Config;
 use crate::convert::ConvertPlan;
 use crate::convert::ConvertPlanOpts;
@@ -57,15 +57,13 @@ impl App {
             .execute()?,
             cli::Command::Clone(args) => crate::clone::clone(self.git()?, args.to_owned())?,
             cli::Command::Add(args) => WorktreePlan::new(self.git()?, args)?.execute()?,
-            cli::Command::Config(ConfigCommand::Generate(args)) => {
-                self.config_generate(args.to_owned())?
-            }
+            cli::Command::Config(ConfigCommand::Init(args)) => self.config_init(args.to_owned())?,
         }
 
         Ok(())
     }
 
-    fn config_generate(&self, args: ConfigGenerateArgs) -> miette::Result<()> {
+    fn config_init(&self, args: ConfigInitArgs) -> miette::Result<()> {
         let path = match &args.output {
             Some(path) => {
                 if path == "-" {
