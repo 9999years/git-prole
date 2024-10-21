@@ -7,8 +7,14 @@ on:
 
 jobs:
   check-flake:
-    name: Check Nix flake
-    runs-on: ubuntu-latest
+    name: Check Nix flake (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
