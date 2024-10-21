@@ -193,11 +193,11 @@ pub struct AddArgsInner {
 #[derive(Debug, Clone, Subcommand)]
 pub enum ConfigCommand {
     /// Initialize a default configuration file.
-    Generate(ConfigGenerateArgs),
+    Init(ConfigInitArgs),
 }
 
 #[derive(Args, Clone, Debug)]
-pub struct ConfigGenerateArgs {
+pub struct ConfigInitArgs {
     /// The location to write the configuration file. Can be `-` for stdout. Defaults to
     /// `~/.config/git-prole/config.toml`.
     pub output: Option<Utf8PathBuf>,

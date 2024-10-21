@@ -1,0 +1,14 @@
+[book]
+authors = [
+    "Rebecca Turner",
+]
+language = "en"
+multilingual = false
+src = "."
+title = "git-prole"
+
+[output.html]
+smart-punctuation = true
+git-repository-url = "https://github.com/9999years/git-prole"
+git-repository-icon = "fa-github"
+edit-url-template = "https://github.com/9999years/git-prole/edit/main/docs/{path}"
