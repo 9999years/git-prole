@@ -65,7 +65,7 @@ jobs:
           # Fetch all history/tags (needed to compute versions)
           fetch-depth: 0
 
-      - uses: cachix/install-nix-action@v22
+      - uses: cachix/install-nix-action@v30
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
           extra_nix_config: |

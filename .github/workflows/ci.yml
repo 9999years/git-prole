@@ -1,0 +1,36 @@
+---
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  check-flake:
+    name: Check Nix flake
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - uses: cachix/install-nix-action@v30
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+          extra_nix_config: |
+            extra-experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: nix flake check
+        run: nix flake check --verbose --print-build-logs
+
+      - name: nix develop
+        run: nix develop --verbose --print-build-logs --command true
+
+      - name: nix build
+        run: nix build --verbose --print-build-logs
+
+      - name: nix build (misc)
+        run: |
+          nix build --verbose --print-build-logs .#cargo
+          nix build --verbose --print-build-logs .#get-crate-version
+          nix build --verbose --print-build-logs .#make-release-commit
