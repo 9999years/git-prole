@@ -15,7 +15,7 @@ jobs:
     name: Publish user manual to GitHub Pages
     runs-on: ubuntu-latest
     steps:
-      - uses: cachix/install-nix-action@v22
+      - uses: cachix/install-nix-action@v30
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
           extra_nix_config: |
