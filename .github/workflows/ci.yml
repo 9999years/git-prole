@@ -20,6 +20,13 @@ jobs:
             extra-experimental-features = nix-command flakes
             accept-flake-config = true
 
+      - uses: cachix/cachix-action@v15
+        with:
+          name: 9999years
+          authToken: '${{ secrets.CACHIX_TOKEN }}'
+
+      - uses: DeterminateSystems/magic-nix-cache-action@v8
+
       - name: nix flake check
         run: nix flake check --verbose --print-build-logs
 
