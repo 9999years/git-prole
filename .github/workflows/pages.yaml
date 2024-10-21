@@ -23,14 +23,17 @@ jobs:
             accept-flake-config = true
 
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Build user manual
         run: |
           RESULT=$(nix build --no-link --print-out-paths --print-build-logs .#git-prole.user-manual)
           cp -r "$RESULT/share/git-prole/html-manual" git-prole-user-manual
 
-      - name: Publish to GitHub Pages
-        uses: JamesIves/github-pages-deploy-action@v4
+      - name: Upload GitHub Pages assets
+        uses: actions/upload-pages-artifact@v3
         with:
-          folder: git-prole-user-manual/
+          path: git-prole-user-manual/
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
