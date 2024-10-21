@@ -27,10 +27,10 @@ jobs:
 
       - name: Build user manual
         run: |
-          RESULT=$(nix build --no-link --print-out-paths --print-build-logs .#ghciwatch.user-manual)
-          cp -r "$RESULT/share/ghciwatch/html-manual" ghciwatch-user-manual
+          RESULT=$(nix build --no-link --print-out-paths --print-build-logs .#git-prole.user-manual)
+          cp -r "$RESULT/share/git-prole/html-manual" git-prole-user-manual
 
       - name: Publish to GitHub Pages
         uses: JamesIves/github-pages-deploy-action@v4
         with:
-          folder: ghciwatch-user-manual/
+          folder: git-prole-user-manual/

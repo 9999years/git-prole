@@ -197,9 +197,9 @@ jobs:
         #     - uses: actions/upload-artifact@v4
         #       with:
         #         name: linux
-        #         path: target/release/ghciwatch-aarch64-linux
+        #         path: target/release/git-prole-aarch64-linux
         #
-        # will be downloaded to `linux/ghciwatch-aarch64-linux`.
+        # will be downloaded to `linux/git-prole-aarch64-linux`.
         uses: actions/download-artifact@v4
 
       - name: Create release
