@@ -5,6 +5,8 @@ on:
     branches:
       - main
 
+name: CI
+
 jobs:
   check-flake:
     name: Check Nix flake (${{ matrix.os }})

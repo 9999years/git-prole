@@ -87,6 +87,8 @@
         (lib.filterAttrs (name: value: lib.isDerivation value) packages)
         // {
           default = packages.git-prole;
+          git-prole-user-manual = packages.git-prole.user-manual;
+          git-prole-user-manual-tar-xz = packages.git-prole.user-manual-tar-xz;
 
           # This lets us use `nix run .#cargo` to run Cargo commands without
           # loading the entire `nix develop` shell (which includes

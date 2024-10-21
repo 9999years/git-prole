@@ -137,6 +137,13 @@ jobs:
           mv target/aarch64-unknown-linux-musl/release/git-prole \
              target/release/git-prole-aarch64-linux
 
+
+      - name: Build user manual
+        if: runner.os == 'Linux'
+        run: |
+          RESULT=$(nix build --no-link --print-out-paths --print-build-logs .#git-prole.user-manual-tar-xz)
+          cp "$RESULT" target/git-prole-user-manual.tar.xz
+
       - name: Upload macOS executable
         uses: actions/upload-artifact@v4
         if: runner.os == 'macOS'
@@ -153,6 +160,7 @@ jobs:
           path: |
             target/release/git-prole-x86_64-linux
             target/release/git-prole-aarch64-linux
+            target/git-prole-user-manual.tar.xz
 
       - name: Publish to crates.io
         if: runner.os == 'Linux'
