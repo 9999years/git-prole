@@ -27,7 +27,7 @@ where
         return Err(miette!("--dry-run is not supported for this command yet"));
     }
 
-    if git.config.file.enable_gh()
+    if git.config.file.clone.enable_gh()
         && looks_like_gh_url(&args.repository)
         && which_global("gh").is_ok()
     {

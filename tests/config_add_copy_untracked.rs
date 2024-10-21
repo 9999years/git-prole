@@ -4,10 +4,17 @@ use test_harness::GitProle;
 use test_harness::WorktreeState;
 
 #[test]
-fn config_copy_untracked_default() -> miette::Result<()> {
+fn config_add_copy_untracked() -> miette::Result<()> {
     let prole = GitProle::new()?;
 
     prole.setup_worktree_repo("my-repo")?;
+
+    prole.write_config(
+        "
+        [add]
+        copy_untracked = false
+        ",
+    )?;
 
     prole.sh("
         cd my-repo/main || exit
@@ -18,8 +25,6 @@ fn config_copy_untracked_default() -> miette::Result<()> {
         .cd_cmd("my-repo/main")
         .args(["add", "puppy"])
         .status_checked()?;
-
-    // The untracked file is copied to the new worktree.
 
     prole
         .repo_state("my-repo")
@@ -37,14 +42,9 @@ fn config_copy_untracked_default() -> miette::Result<()> {
             WorktreeState::new("puppy")
                 .branch("puppy")
                 .upstream("main")
-                // The untracked file is copied to the new worktree.
-                .file(
-                    "animal-facts.txt",
-                    expect![[r#"
-                        puppy doggy
-                    "#]],
-                )
-                .status(["?? animal-facts.txt"]),
+                // The untracked file is not copied to the new worktree.
+                .no_file("animal-facts.txt")
+                .status([]),
         ])
         .assert();
 

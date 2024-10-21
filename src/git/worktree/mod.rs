@@ -255,7 +255,7 @@ where
     /// E.g. to convert a repo `~/puppy` with default branch `main`, this will return `main`,
     /// to indicate a worktree to be placed in `~/puppy/main`.
     pub fn dirname_for<'b>(&self, branch: &'b str) -> Cow<'b, str> {
-        let branch_replacements = self.0.config.file.branch_replacements();
+        let branch_replacements = self.0.config.file.add.branch_replacements();
         if branch_replacements.is_empty() {
             Cow::Borrowed(final_component(branch))
         } else {

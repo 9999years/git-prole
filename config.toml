@@ -9,7 +9,7 @@
 # 2. Any remotes listed here.
 #
 # This is used to pick a default branch; see `default_branches`.
-remotes = [
+remote_names = [
     "upstream",
     "origin",
 ]
@@ -27,12 +27,27 @@ remotes = [
 # When `git prole add` is used to create a new worktree, if a new branch is
 # created, the branch will be set to the default branch unless another starting
 # point is given explicitly.
-default_branches = [
+branch_names = [
     "main",
     "master",
     "trunk",
 ]
 
+# Clone a repository into a worktree repository.
+#
+# `man git-prole-clone`
+[clone]
+# When you run `git prole clone foo/bar`, if `enable_gh = true` and `gh` is
+# installed, I'll run `gh repo clone foo/bar` as a shortcut for GitHub
+# repositories.
+#
+# See: https://cli.github.com/
+enable_gh = false
+
+# Add a new worktree to the current repository.
+#
+# `man git-prole-add`
+[add]
 # When `git prole add` is used to create a new worktree, untracked files are
 # copied to the new worktree from the current worktree by default.
 #
@@ -41,13 +56,6 @@ default_branches = [
 # files can take some time, so this setting can be used to disable this
 # behavior if needed.
 copy_untracked = true
-
-# When you run `git prole clone foo/bar`, if `enable_gh = true` and `gh` is
-# installed, I'll run `gh repo clone foo/bar` as a shortcut for GitHub
-# repositories.
-#
-# See: https://cli.github.com/
-enable_gh = false
 
 # Commands to run when a new worktree is added.
 commands = [
@@ -61,6 +69,11 @@ commands = [
 
 # A list of regex replacements which are applied to branch names to determine
 # directory names.
+#
+# This settings is also used by `git prole convert` to resolve branch names
+# into directory names.
+#
+# For syntax, see: https://docs.rs/regex/latest/regex/#syntax
 #
 # By default, when you create a worktree for a branch with a `/` in it, `git
 # prole` will use the last component of the name; e.g., `git prole add
@@ -87,6 +100,4 @@ commands = [
 #     find = '''puppy'''
 #     replace = '''doggy'''
 #     count = 1
-#
-# See: https://docs.rs/regex/latest/regex/#syntax
 branch_replacements = []

@@ -10,7 +10,7 @@ fn add_from_non_worktree_repo() -> miette::Result<()> {
 
     prole.write_config(
         r#"
-        default_branches = []
+        branch_names = []
         "#,
     )?;
 

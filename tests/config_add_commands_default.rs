@@ -3,7 +3,7 @@ use test_harness::GitProle;
 use test_harness::WorktreeState;
 
 #[test]
-fn config_commands_default() -> miette::Result<()> {
+fn config_add_commands_default() -> miette::Result<()> {
     let prole = GitProle::new()?;
     prole.setup_worktree_repo("my-repo")?;
 

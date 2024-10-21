@@ -4,12 +4,13 @@ use test_harness::GitProle;
 use test_harness::WorktreeState;
 
 #[test]
-fn config_commands() -> miette::Result<()> {
+fn config_add_commands() -> miette::Result<()> {
     let prole = GitProle::new()?;
     prole.setup_worktree_repo("my-repo")?;
 
     prole.write_config(
         r#"
+        [add]
         commands = [
             "sh -c 'echo Puppy wuz here > puppy-log'",
             { sh = '''

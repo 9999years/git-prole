@@ -3,7 +3,7 @@ use test_harness::GitProle;
 use test_harness::WorktreeState;
 
 #[test]
-fn config_default_branches_default() -> miette::Result<()> {
+fn config_branch_names_default() -> miette::Result<()> {
     let prole = GitProle::new()?;
 
     prole.setup_repo("my-remotes/my-repo")?;

@@ -30,9 +30,9 @@ pub fn setup_repo_multiple_remotes(
         done
         git clone "{remote_path}" "{repo}"
         cd "{repo}" || exit
-        git remote add a ../my-remotes/a
-        git remote add b ../my-remotes/b
-        git remote add c ../my-remotes/c
+        git remote add a ../{remote_path}/../a
+        git remote add b ../{remote_path}/../b
+        git remote add c ../{remote_path}/../c
         "#
     ))?;
 
