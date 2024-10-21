@@ -83,14 +83,21 @@ impl RepoState {
             let mut expected_worktrees = worktrees
                 .iter()
                 .map(|worktree| {
-                    (
-                        self.root()
-                            .join(&worktree.path)
-                            .canonicalize_utf8()
-                            .map_err(|err| format!("{err}: {}", worktree.path))
-                            .expect("Worktree path should be canonicalize-able"),
-                        worktree,
-                    )
+                    let path = self.root().join(&worktree.path);
+
+                    if !path.exists() {
+                        panic!(
+                            "Worktree {} doesn't exist. Worktrees:\n{}",
+                            worktree.path, actual_worktrees
+                        );
+                    }
+
+                    let path = path
+                        .canonicalize_utf8()
+                        .map_err(|err| format!("{err}: {}", worktree.path))
+                        .expect("Worktree path should be canonicalize-able");
+
+                    (path, worktree)
                 })
                 .collect::<FxHashMap<_, _>>();
 

@@ -4,6 +4,7 @@ use camino::Utf8PathBuf;
 use clap::Parser;
 use miette::Context;
 use miette::IntoDiagnostic;
+use regex::Regex;
 use serde::de::Error;
 use serde::Deserialize;
 use unindent::unindent;
@@ -87,22 +88,19 @@ fn config_file_path(dirs: &BaseDirectories) -> miette::Result<Utf8PathBuf> {
 /// Each configuration key should have two test cases:
 /// - `config_{key}` for setting the value.
 /// - `config_{key}_default` for the default value.
+///
+/// For documentation, see the default configuration file (`../config.toml`).
+///
+/// The default configuration file is accessible as [`Config::DEFAULT`].
 #[derive(Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(default)]
 pub struct ConfigFile {
-    #[serde(default)]
     remotes: Vec<String>,
-
-    #[serde(default)]
     default_branches: Vec<String>,
-
-    #[serde(default)]
     copy_untracked: Option<bool>,
-
-    #[serde(default)]
     enable_gh: Option<bool>,
-
-    #[serde(default)]
     commands: Vec<ShellCommand>,
+    branch_replacements: Vec<BranchReplacement>,
 }
 
 impl ConfigFile {
@@ -134,8 +132,12 @@ impl ConfigFile {
         self.enable_gh.unwrap_or(false)
     }
 
-    pub fn commands(&self) -> Vec<ShellCommand> {
-        self.commands.clone()
+    pub fn commands(&self) -> &[ShellCommand] {
+        &self.commands
+    }
+
+    pub fn branch_replacements(&self) -> &[BranchReplacement] {
+        &self.branch_replacements
     }
 }
 
@@ -194,6 +196,30 @@ impl<'de> Deserialize<'de> for ShellArgs {
     }
 }
 
+#[derive(Clone, Debug, Deserialize)]
+pub struct BranchReplacement {
+    #[serde(deserialize_with = "deserialize_regex")]
+    pub find: Regex,
+    pub replace: String,
+    pub count: Option<usize>,
+}
+
+impl PartialEq for BranchReplacement {
+    fn eq(&self, other: &Self) -> bool {
+        self.replace == other.replace && self.find.as_str() == other.find.as_str()
+    }
+}
+
+impl Eq for BranchReplacement {}
+
+fn deserialize_regex<'de, D>(deserializer: D) -> Result<Regex, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let input: String = Deserialize::deserialize(deserializer)?;
+    Regex::new(&input).map_err(D::Error::custom)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -201,14 +227,37 @@ mod tests {
 
     #[test]
     fn test_default_config_file_parse() {
+        let default_config = toml::from_str::<ConfigFile>(Config::DEFAULT).unwrap();
         assert_eq!(
-            toml::from_str::<ConfigFile>(Config::DEFAULT).unwrap(),
+            default_config,
             ConfigFile {
                 remotes: vec!["upstream".to_owned(), "origin".to_owned(),],
                 default_branches: vec!["main".to_owned(), "master".to_owned(), "trunk".to_owned(),],
                 copy_untracked: Some(true),
                 enable_gh: Some(false),
                 commands: vec![],
+                branch_replacements: vec![],
+            }
+        );
+
+        let empty_config = toml::from_str::<ConfigFile>("").unwrap();
+        assert_eq!(
+            default_config,
+            ConfigFile {
+                remotes: empty_config.remotes(),
+                default_branches: empty_config.default_branches(),
+                copy_untracked: Some(empty_config.copy_untracked()),
+                enable_gh: Some(empty_config.enable_gh()),
+                commands: empty_config
+                    .commands()
+                    .iter()
+                    .map(|command| command.to_owned())
+                    .collect(),
+                branch_replacements: empty_config
+                    .branch_replacements()
+                    .iter()
+                    .map(|replacement| replacement.to_owned())
+                    .collect()
             }
         );
     }

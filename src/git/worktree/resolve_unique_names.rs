@@ -196,7 +196,7 @@ where
         self.worktree
             .head
             .branch()
-            .map(|branch| self.git.worktree().dirname_for(branch.branch_name()).into())
+            .map(|branch| self.git.worktree().dirname_for(branch.branch_name()))
             .into_iter()
     }
 
