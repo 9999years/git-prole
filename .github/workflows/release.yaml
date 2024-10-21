@@ -102,7 +102,7 @@ jobs:
       - name: Create macOS universal executable
         if: runner.os == 'macOS'
         run: |
-          lipo -create -output target/release/git-prole-macos \
+          lipo -create -output target/git-prole-macos \
             target/x86_64-apple-darwin/release/git-prole \
             target/aarch64-apple-darwin/release/git-prole
 
@@ -133,10 +133,9 @@ jobs:
         run: |
           mkdir -p target/release
           mv target/x86_64-unknown-linux-musl/release/git-prole \
-             target/release/git-prole-x86_64-linux
+             target/git-prole-x86_64-linux
           mv target/aarch64-unknown-linux-musl/release/git-prole \
-             target/release/git-prole-aarch64-linux
-
+             target/git-prole-aarch64-linux
 
       - name: Build user manual
         if: runner.os == 'Linux'
@@ -150,7 +149,7 @@ jobs:
         with:
           name: macos
           path: |
-            target/release/git-prole-macos
+            target/git-prole-macos
 
       - name: Upload Linux executables
         uses: actions/upload-artifact@v4
@@ -158,8 +157,8 @@ jobs:
         with:
           name: linux
           path: |
-            target/release/git-prole-x86_64-linux
-            target/release/git-prole-aarch64-linux
+            target/git-prole-x86_64-linux
+            target/git-prole-aarch64-linux
             target/git-prole-user-manual.tar.xz
 
       - name: Publish to crates.io
