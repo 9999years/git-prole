@@ -45,7 +45,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - uses: cachix/install-nix-action@v22
+      - uses: cachix/install-nix-action@v30
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
           extra_nix_config: |
@@ -78,7 +78,7 @@ jobs:
         with:
           target: x86_64-apple-darwin, aarch64-apple-darwin
 
-      - uses: cachix/install-nix-action@v22
+      - uses: cachix/install-nix-action@v30
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
           extra_nix_config: |
