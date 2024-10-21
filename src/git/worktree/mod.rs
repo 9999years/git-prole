@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::ffi::OsStr;
 use std::fmt::Debug;
 use std::process::Command;
@@ -13,6 +14,8 @@ use tap::Tap;
 use tracing::instrument;
 use utf8_command::Utf8Output;
 
+use crate::config::BranchReplacement;
+use crate::final_component;
 use crate::AppGit;
 
 use super::BranchRef;
@@ -251,12 +254,25 @@ where
     ///
     /// E.g. to convert a repo `~/puppy` with default branch `main`, this will return `main`,
     /// to indicate a worktree to be placed in `~/puppy/main`.
-    ///
-    /// TODO: Should support some configurable regex filtering or other logic?
-    pub fn dirname_for<'b>(&self, branch: &'b str) -> &'b str {
-        match branch.rsplit_once('/') {
-            Some((_left, right)) => right,
-            None => branch,
+    pub fn dirname_for<'b>(&self, branch: &'b str) -> Cow<'b, str> {
+        let branch_replacements = self.0.config.file.branch_replacements();
+        if branch_replacements.is_empty() {
+            Cow::Borrowed(final_component(branch))
+        } else {
+            let mut dirname = branch.to_owned();
+            for BranchReplacement {
+                find,
+                replace,
+                count,
+            } in branch_replacements
+            {
+                dirname = match count {
+                    Some(count) => find.replacen(&dirname, *count, replace),
+                    None => find.replace_all(&dirname, replace),
+                }
+                .into_owned();
+            }
+            dirname.into()
         }
     }
 
@@ -267,7 +283,7 @@ where
     pub fn path_for(&self, branch: &str) -> miette::Result<Utf8PathBuf> {
         Ok(self
             .container()?
-            .tap_mut(|p| p.push(self.dirname_for(branch))))
+            .tap_mut(|p| p.push(&*self.dirname_for(branch))))
     }
 
     /// Resolves a set of worktrees into a map from worktree paths to unique names.

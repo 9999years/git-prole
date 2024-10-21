@@ -58,3 +58,35 @@ commands = [
     #   fi
     #   ''' },
 ]
+
+# A list of regex replacements which are applied to branch names to determine
+# directory names.
+#
+# By default, when you create a worktree for a branch with a `/` in it, `git
+# prole` will use the last component of the name; e.g., `git prole add
+# -b puppy/doggy` creates a directory named `doggy` for a new branch
+# `puppy/doggy`.
+#
+# However, this might not be the most convenient behavior for you, so you can
+# substitute this behavior with a series of regex replacements instead.
+#
+# For example, my ticket tracker at work auto-generates branch names like
+# `rebeccat/team-1234-some-ticket-title-which-is-way-too-long`. With
+# configuration like this:
+#
+#     [[branch_replacements]]
+#     find = '''\w+/\w{1,4}-\d{1,5}-(\w+(?:-\w+){0,2}).*'''
+#     replace = '''$1'''
+#
+# `git prole add -b ...` will create a directory named `some-ticket-title`.
+# (The branch name will still be unchanged and way too long.)
+#
+# For completeness, you can also specify how many replacements are performed:
+#
+#     [[branch_replacements]]
+#     find = '''puppy'''
+#     replace = '''doggy'''
+#     count = 1
+#
+# See: https://docs.rs/regex/latest/regex/#syntax
+branch_replacements = []

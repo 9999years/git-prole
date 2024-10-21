@@ -257,7 +257,7 @@ where
             let name = git
                 .worktree()
                 .dirname_for(default_branch.branch_name())
-                .to_owned();
+                .into_owned();
 
             // If we're creating a worktree for a default branch from a
             // remote, we may not have a corresponding local branch

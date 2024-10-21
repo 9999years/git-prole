@@ -11,11 +11,11 @@ use miette::Context;
 use miette::IntoDiagnostic;
 use owo_colors::OwoColorize;
 use owo_colors::Stream;
-use tap::Tap;
 use tracing::instrument;
 
 use crate::app_git::AppGit;
 use crate::cli::AddArgs;
+use crate::final_component;
 use crate::format_bulleted_list::format_bulleted_list;
 use crate::git::BranchRef;
 use crate::git::GitLike;
@@ -87,9 +87,7 @@ impl<'a> WorktreePlan<'a> {
                         .into_diagnostic()?
                 } else {
                     // Test case: `add_by_name_new_local`.
-                    git.worktree()
-                        .container()?
-                        .tap_mut(|p| p.push(name_or_path))
+                    git.worktree().path_for(name_or_path)?
                 }
             }
             None => {
@@ -368,7 +366,9 @@ impl BranchStartPointPlan {
                         .name_or_path
                         .as_deref()
                         .expect("If `--branch` is not given, `NAME_OR_PATH` must be given");
-                    let dirname = git.worktree().dirname_for(name_or_path);
+                    // TODO: It would be nice if there was a set of regexes for the
+                    // branch name itself, as well.
+                    let dirname = final_component(name_or_path);
 
                     match &args.commitish {
                         Some(commitish) => match Self::from_commitish(git, commitish)? {
