@@ -23,9 +23,18 @@
   };
 
   nixConfig = {
-    extra-substituters = [ "https://cache.garnix.io" ];
-    extra-trusted-substituters = [ "https://cache.garnix.io" ];
-    extra-trusted-public-keys = [ "cache.garnix.io:CTFPyKSLcx5RMJKfLo5EEPUObbA78b0YQ2DTCJXqr9g=" ];
+    extra-substituters = [
+      "https://cache.garnix.io"
+      "https://9999years.cachix.org"
+    ];
+    extra-trusted-substituters = [
+      "https://cache.garnix.io"
+      "https://9999years.cachix.org"
+    ];
+    extra-trusted-public-keys = [
+      "cache.garnix.io:CTFPyKSLcx5RMJKfLo5EEPUObbA78b0YQ2DTCJXqr9g="
+      "9999years.cachix.org-1:C6zdfIAI7Sj8X2Ws6B/SLLEkoHBsLvCpKizBhqNz72g="
+    ];
   };
 
   outputs =
