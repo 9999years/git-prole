@@ -87,7 +87,7 @@ commands = [
 # `rebeccat/team-1234-some-ticket-title-which-is-way-too-long`. With
 # configuration like this:
 #
-#     [[branch_replacements]]
+#     [[add.branch_replacements]]
 #     find = '''\w+/\w{1,4}-\d{1,5}-(\w+(?:-\w+){0,2}).*'''
 #     replace = '''$1'''
 #
@@ -96,7 +96,7 @@ commands = [
 #
 # For completeness, you can also specify how many replacements are performed:
 #
-#     [[branch_replacements]]
+#     [[add.branch_replacements]]
 #     find = '''puppy'''
 #     replace = '''doggy'''
 #     count = 1
