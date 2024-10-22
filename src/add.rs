@@ -119,7 +119,6 @@ impl<'a> WorktreePlan<'a> {
         };
 
         self.git.worktree().add_command(
-            // TODO: What if the destination already exists?
             &self.destination,
             &AddWorktreeOpts {
                 force_branch,
@@ -170,6 +169,14 @@ impl<'a> WorktreePlan<'a> {
     pub fn execute(&self) -> miette::Result<()> {
         let mut command = self.command();
 
+        // Test: `add_destination_exists`
+        if self.destination.exists() {
+            return Err(miette!(
+                "Worktree destination {} already exists",
+                self.destination.display_path_cwd()
+            ));
+        }
+
         tracing::info!("{self}");
         tracing::debug!("{self:#?}");
 
@@ -179,10 +186,11 @@ impl<'a> WorktreePlan<'a> {
                 '$'.if_supports_color(Stream::Stdout, |text| text.green()),
                 Utf8ProgramAndArgs::from(&command)
             );
-        } else {
-            command.status_checked()?;
-            self.copy_untracked()?;
+            return Ok(());
         }
+
+        command.status_checked()?;
+        self.copy_untracked()?;
         self.run_commands()?;
         Ok(())
     }

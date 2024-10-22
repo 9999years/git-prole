@@ -94,6 +94,9 @@ commands = [
 # `git prole add -b ...` will create a directory named `some-ticket-title`.
 # (The branch name will still be unchanged and way too long.)
 #
+# Note that if the result of applying your regex substitutions includes a `/`,
+# the last component of the result will be used.
+#
 # For completeness, you can also specify how many replacements are performed:
 #
 #     [[add.branch_replacements]]
