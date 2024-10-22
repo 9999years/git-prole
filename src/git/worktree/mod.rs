@@ -272,7 +272,20 @@ where
                 }
                 .into_owned();
             }
-            dirname.into()
+
+            if dirname.contains(std::path::MAIN_SEPARATOR_STR) {
+                let final_component = final_component(&dirname);
+                tracing::warn!(
+                    %branch,
+                    after_replacements=%dirname,
+                    using=%final_component,
+                    "Applying `add.branch_replacements` substitutions resulted in a directory name which includes a `{}`",
+                    std::path::MAIN_SEPARATOR_STR,
+                );
+                final_component.to_owned().into()
+            } else {
+                dirname.into()
+            }
         }
     }
 
