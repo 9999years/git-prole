@@ -40,7 +40,7 @@ where
         Ok(self
             .0
             .command()
-            .args(["config", "get", "--null", key])
+            .args(["config", "--get", "--null", key])
             .output_checked_as(|context: OutputContext<Utf8Output>| {
                 if context.status().success() {
                     // TODO: Should this be a winnow parser?
