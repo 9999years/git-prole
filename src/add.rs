@@ -22,6 +22,7 @@ use crate::git::GitLike;
 use crate::git::LocalBranchRef;
 use crate::AddWorktreeOpts;
 use crate::PathDisplay;
+use crate::StatusEntry;
 use crate::Utf8Absolutize;
 
 /// A plan for creating a new `git worktree`.
@@ -30,8 +31,28 @@ pub struct WorktreePlan<'a> {
     git: AppGit<'a, Utf8PathBuf>,
     destination: Utf8PathBuf,
     branch: BranchStartPointPlan,
-    /// Relative paths to copy to the new worktree, if any.
-    copy_untracked: Vec<Utf8PathBuf>,
+    copy_ignored: Vec<StatusEntry>,
+}
+
+impl Display for WorktreePlan<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Creating worktree in {} {}",
+            self.destination.display_path_cwd(),
+            self.branch,
+        )?;
+
+        if !self.copy_ignored.is_empty() {
+            write!(
+                f,
+                "\nCopying {} ignored paths to new worktree",
+                self.copy_ignored.len()
+            )?;
+        }
+
+        Ok(())
+    }
 }
 
 impl<'a> WorktreePlan<'a> {
@@ -53,19 +74,24 @@ impl<'a> WorktreePlan<'a> {
         let git = git.with_current_dir(worktree);
         let branch = BranchStartPointPlan::new(&git, args)?;
         let destination = Self::destination_plan(&git, args, &branch)?;
-        let copy_untracked = Self::untracked_plan(&git)?;
+        let copy_ignored = Self::copy_ignored_plan(&git)?;
         Ok(Self {
             git,
             branch,
             destination,
-            copy_untracked,
+            copy_ignored,
         })
     }
 
     #[instrument(level = "trace")]
-    fn untracked_plan(git: &AppGit<'_, Utf8PathBuf>) -> miette::Result<Vec<Utf8PathBuf>> {
-        if git.config.file.add.copy_untracked() && git.worktree().is_inside()? {
-            git.status().untracked_files()
+    fn copy_ignored_plan(git: &AppGit<'_, Utf8PathBuf>) -> miette::Result<Vec<StatusEntry>> {
+        if git.config.file.add.copy_ignored() && git.worktree().is_inside()? {
+            Ok(git
+                .status()
+                .get()?
+                .into_iter()
+                .filter(|entry| entry.is_ignored())
+                .collect())
         } else {
             Ok(Vec::new())
         }
@@ -136,15 +162,17 @@ impl<'a> WorktreePlan<'a> {
     }
 
     #[instrument(level = "trace")]
-    fn copy_untracked(&self) -> miette::Result<()> {
-        if self.copy_untracked.is_empty() {
+    fn copy_ignored(&self) -> miette::Result<()> {
+        if self.copy_ignored.is_empty() {
             return Ok(());
         }
+
         tracing::info!(
             "Copying untracked files to {}",
             self.destination.display_path_cwd()
         );
-        for path in &self.copy_untracked {
+        for entry in &self.copy_ignored {
+            let path = &entry.path;
             let from = self.git.get_current_dir().join(path);
             let to = self.destination.join(path);
             tracing::trace!(
@@ -190,7 +218,7 @@ impl<'a> WorktreePlan<'a> {
         }
 
         command.status_checked()?;
-        self.copy_untracked()?;
+        self.copy_ignored()?;
         self.run_commands()?;
         Ok(())
     }
@@ -211,27 +239,6 @@ impl<'a> WorktreePlan<'a> {
             if let Err(err) = status {
                 tracing::error!("{err}");
             }
-        }
-
-        Ok(())
-    }
-}
-
-impl Display for WorktreePlan<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Creating worktree in {} {}",
-            self.destination.display_path_cwd(),
-            self.branch,
-        )?;
-
-        if !self.copy_untracked.is_empty() {
-            write!(
-                f,
-                "\nCopying {} untracked paths to new worktree",
-                self.copy_untracked.len()
-            )?;
         }
 
         Ok(())

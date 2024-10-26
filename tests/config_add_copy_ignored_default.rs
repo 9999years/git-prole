@@ -4,18 +4,10 @@ use test_harness::GitProle;
 use test_harness::WorktreeState;
 
 #[test]
-fn config_add_copy_untracked() -> miette::Result<()> {
+fn config_add_copy_ignored_default() -> miette::Result<()> {
     let prole = GitProle::new()?;
 
     prole.setup_worktree_repo("my-repo")?;
-
-    prole.write_config(
-        "
-        [add]
-        # Backwards-compatible alias for `copy_ignored`. Does not do what it says!
-        copy_untracked = false
-        ",
-    )?;
 
     prole.sh("
         cd my-repo/main || exit
@@ -32,6 +24,8 @@ fn config_add_copy_untracked() -> miette::Result<()> {
         .args(["add", "puppy"])
         .status_checked()?;
 
+    // The untracked file is copied to the new worktree.
+
     prole
         .repo_state("my-repo")
         .worktrees([
@@ -39,7 +33,7 @@ fn config_add_copy_untracked() -> miette::Result<()> {
             WorktreeState::new("main")
                 .branch("main")
                 .file(
-                    "animal-facts.txt",
+                    "compiled-animal-facts.txt",
                     expect![[r#"
                         puppy doggy
                     "#]],
@@ -48,11 +42,14 @@ fn config_add_copy_untracked() -> miette::Result<()> {
             WorktreeState::new("puppy")
                 .branch("puppy")
                 .upstream("main")
-                // The untracked file is not copied to the new worktree.
-                .no_file("animal-facts.txt")
-                // The ignored file is not copied to the new worktree.
-                .no_file("compiled-animal-facts.txt")
-                .status([]),
+                // The untracked file is copied to the new worktree.
+                .file(
+                    "compiled-animal-facts.txt",
+                    expect![[r#"
+                        puppy doggy
+                    "#]],
+                )
+                .status(["!! compiled-animal-facts.txt"]),
         ])
         .assert();
 
