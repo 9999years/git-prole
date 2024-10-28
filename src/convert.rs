@@ -211,7 +211,6 @@ where
         //     suffix removed
         //   - Otherwise just use the git dir path.
 
-        let tempdir = Utf8TempDir::new()?.into_path();
         // Tests:
         // - `convert_from_bare`
         // - `convert_bare_dot_git`
@@ -227,7 +226,13 @@ where
         let destination_name = destination
             .file_name()
             .ok_or_else(|| miette!("Destination has no basename: {destination}"))?;
+        let destination_parent = destination
+            .parent()
+            .ok_or_else(|| miette!("Destination has no parent: {destination}"))?
+            .to_path_buf();
         tracing::debug!(%destination, "Destination determined");
+
+        let tempdir = Utf8TempDir::new(&destination_parent)?.into_path();
 
         let default_branch = match opts.default_branch {
             // Tests:
@@ -552,6 +557,17 @@ where
             self.destination.display_path_cwd()
         );
         tracing::info!("You may need to `cd .` to refresh your shell");
+
+        // Make sure to delete the tempdir if it's empty
+        match fs_err::read_dir(&self.tempdir) {
+            Ok(rd) => {
+                if rd.count() == 1 {
+                    tracing::info!("Temporary directory isn't empty: {0}", self.tempdir)
+                }
+            }
+            Err(err) => miette::bail!(err),
+        };
+        fs::remove_dir(&self.tempdir)?;
 
         Ok(())
     }
