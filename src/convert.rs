@@ -217,10 +217,7 @@ where
         // - `convert_bare_dot_git`
         // - `convert_bare_dot_git_from_parent`
         // - `convert_common_parent`
-        let repo = git.path().repo_root_or_git_common_dir_if_bare()?;
-        let repo = repo
-            .parent()
-            .ok_or_else(|| miette!("Repository path has no parent: {repo}"))?;
+        let repo = git.path().repo_root_display()?;
         let worktrees = git.worktree().list()?;
 
         let destination = Self::destination_plan(&worktrees, &opts)?;
