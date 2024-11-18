@@ -139,13 +139,18 @@ impl CloneConfig {
 #[serde(default)]
 pub struct AddConfig {
     copy_untracked: Option<bool>,
+    copy_ignored: Option<bool>,
     commands: Vec<ShellCommand>,
     branch_replacements: Vec<BranchReplacement>,
 }
 
 impl AddConfig {
-    pub fn copy_untracked(&self) -> bool {
-        self.copy_untracked.unwrap_or(true)
+    pub fn copy_ignored(&self) -> bool {
+        if let Some(copy_untracked) = self.copy_untracked {
+            tracing::warn!("`add.copy_untracked` has been replaced with `add.copy_ignored`");
+            return copy_untracked;
+        }
+        self.copy_ignored.unwrap_or(true)
     }
 
     pub fn commands(&self) -> &[ShellCommand] {
@@ -253,7 +258,8 @@ mod tests {
                     enable_gh: Some(false)
                 },
                 add: AddConfig {
-                    copy_untracked: Some(true),
+                    copy_untracked: None,
+                    copy_ignored: Some(true),
                     commands: vec![],
                     branch_replacements: vec![],
                 }
@@ -270,7 +276,8 @@ mod tests {
                     enable_gh: Some(empty_config.clone.enable_gh()),
                 },
                 add: AddConfig {
-                    copy_untracked: Some(empty_config.add.copy_untracked()),
+                    copy_untracked: None,
+                    copy_ignored: Some(empty_config.add.copy_ignored()),
                     commands: empty_config
                         .add
                         .commands()

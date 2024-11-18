@@ -48,14 +48,18 @@ enable_gh = false
 #
 # `man git-prole-add`
 [add]
-# When `git prole add` is used to create a new worktree, untracked files are
-# copied to the new worktree from the current worktree by default.
+# When `git prole add` is used to create a new worktree, `.gitignored` files
+# are copied to the new worktree from the current worktree by default.
 #
 # This will allow you to get started quickly by copying build products and
 # other configuration files over to the new worktree. However, copying these
 # files can take some time, so this setting can be used to disable this
 # behavior if needed.
-copy_untracked = true
+#
+# Note: Untracked files which are not ignored will not be copied.
+#
+# See: `man 'gitignore(5)'`
+copy_ignored = true
 
 # Commands to run when a new worktree is added.
 commands = [

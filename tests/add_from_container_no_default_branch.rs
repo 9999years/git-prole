@@ -20,6 +20,11 @@ fn add_from_container_no_default_branch() -> miette::Result<()> {
         cd puppy || exit
         git switch -c puppy
         git branch -D main
+
+        echo 'puppy-file' > .gitignore
+        git add .gitignore
+        git commit -m 'Add .gitignore'
+
         echo puppyyyy > puppy-file
     "#)?;
 

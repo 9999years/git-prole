@@ -1,6 +1,7 @@
 use std::fmt::Debug;
 use std::fmt::Display;
 use std::iter;
+use std::ops::Deref;
 use std::str::FromStr;
 
 use camino::Utf8PathBuf;
@@ -56,29 +57,6 @@ where
                     Err(context.error())
                 }
             })?)
-    }
-
-    /// List untracked files and directories.
-    #[instrument(level = "trace")]
-    pub fn untracked_files(&self) -> miette::Result<Vec<Utf8PathBuf>> {
-        Ok(self
-            .0
-            .command()
-            .args([
-                "ls-files",
-                // Show untracked (e.g. ignored) files.
-                "--others",
-                // If a whole directory is classified as other, show just its name and not its
-                // whole contents.
-                "--directory",
-                "-z",
-            ])
-            .output_checked_utf8()?
-            .stdout
-            .split('\0')
-            .filter(|path| !path.is_empty())
-            .map(Utf8PathBuf::from)
-            .collect())
     }
 }
 
@@ -193,6 +171,10 @@ impl StatusEntry {
         })
     }
 
+    pub fn is_ignored(&self) -> bool {
+        self.codes().any(|code| matches!(code, StatusCode::Ignored))
+    }
+
     pub fn parser(input: &mut &str) -> PResult<Self> {
         let left = StatusCode::parser.parse_next(input)?;
         let right = StatusCode::parser.parse_next(input)?;
@@ -270,6 +252,28 @@ impl Status {
 
         let (entries, _eof) = repeat_till(1.., StatusEntry::parser, eof).parse_next(input)?;
         Ok(Self { entries })
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<'_, StatusEntry> {
+        self.entries.iter()
+    }
+}
+
+impl IntoIterator for Status {
+    type Item = StatusEntry;
+
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.entries.into_iter()
+    }
+}
+
+impl Deref for Status {
+    type Target = Vec<StatusEntry>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.entries
     }
 }
 
