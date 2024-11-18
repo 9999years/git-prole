@@ -32,14 +32,32 @@ where
         Self(git)
     }
 
-    /// If in a working tree, get the repository root (`git rev-parse --show-toplevel`). If the
-    /// repository is bare, get the `.git` directory (`git rev-parse --git-dir`). Otherwise, error.
+    /// Get the path of the repository root, for display purposes only.
+    ///
+    /// If in a working tree, get the repository root (`git rev-parse --show-toplevel`).
+    ///
+    /// If the repository is bare, get the `.git` directory (`git rev-parse --git-dir`):
+    /// - If it's named `.git`, get its parent.
+    /// - Otherwise, return it directly.
+    ///
+    /// Otherwise, error.
     #[instrument(level = "trace")]
-    pub fn repo_root_or_git_common_dir_if_bare(&self) -> miette::Result<Utf8PathBuf> {
+    pub fn repo_root_display(&self) -> miette::Result<Utf8PathBuf> {
         if self.0.worktree().is_inside()? {
             self.0.worktree().root()
         } else if self.0.config().is_bare()? {
-            self.git_common_dir()
+            let git_dir = self.git_common_dir()?;
+            let git_dir_basename = git_dir
+                .file_name()
+                .ok_or_else(|| miette!("Git directory has no basename: {git_dir}"))?;
+            if git_dir_basename == ".git" {
+                Ok(git_dir
+                    .parent()
+                    .ok_or_else(|| miette!("Git directory has no parent: {git_dir}"))?
+                    .to_owned())
+            } else {
+                Ok(git_dir)
+            }
         } else {
             Err(miette!(
                 "Path is not in a working tree or a bare repository: {}",
