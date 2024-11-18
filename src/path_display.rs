@@ -30,10 +30,13 @@ pub trait PathDisplay: Debug + AsRef<Path> {
 
 impl<P> PathDisplay for P
 where
-    P: AsRef<Utf8Path> + AsRef<Path> + Debug,
+    P: AsRef<Path> + Debug,
 {
     fn display_path_from(&self, base: impl AsRef<Utf8Path>) -> String {
-        try_display(self, base).unwrap_or_else(|| display_backup(self))
+        let path = self.as_ref();
+        Utf8Path::from_path(path)
+            .and_then(|utf8path| try_display(utf8path, base))
+            .unwrap_or_else(|| display_backup(self))
     }
 }
 

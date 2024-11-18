@@ -558,16 +558,7 @@ where
         );
         tracing::info!("You may need to `cd .` to refresh your shell");
 
-        // Make sure to delete the tempdir if it's empty
-        match fs_err::read_dir(&self.tempdir) {
-            Ok(rd) => {
-                if rd.count() == 1 {
-                    tracing::info!("Temporary directory isn't empty: {0}", self.tempdir)
-                }
-            }
-            Err(err) => miette::bail!(err),
-        };
-        fs::remove_dir(&self.tempdir)?;
+        remove_tempdir_if_empty(&self.tempdir)?;
 
         Ok(())
     }
@@ -681,4 +672,32 @@ impl MainWorktreePlan {
     ) -> Utf8PathBuf {
         self.inner.destination(convert_plan).join(".git")
     }
+}
+
+fn remove_tempdir_if_empty(tempdir: &Utf8Path) -> miette::Result<()> {
+    let contents = fs::read_dir(tempdir)?.collect::<Vec<_>>();
+    // From `std::fs::read_dir` documentation:
+    // > Entries for the current and parent directories (typically . and ..) are skipped.
+    if !contents.is_empty() {
+        tracing::warn!(
+            "Temporary directory isn't empty: {}\n{}",
+            tempdir.display_path_cwd(),
+            display_dir_contents(&contents)
+        );
+    } else {
+        fs::remove_dir(tempdir)?;
+    }
+
+    Ok(())
+}
+
+fn display_dir_contents(contents: &[std::io::Result<fs_err::DirEntry>]) -> String {
+    format_bulleted_list(contents.iter().map(|item| {
+        match item {
+            Ok(entry) => entry.file_name().display_path_cwd(),
+            Err(error) => error
+                .if_supports_color(Stream::Stdout, |text| text.red())
+                .to_string(),
+        }
+    }))
 }
