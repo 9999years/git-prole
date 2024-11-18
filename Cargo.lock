@@ -338,7 +338,7 @@ dependencies = [
 
 [[package]]
 name = "git-prole"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "calm_io",
  "camino",

@@ -15,7 +15,7 @@ publish = false # Don't do `cargo publish`.
 
 [package]
 name = "git-prole"
-version = "0.5.2"
+version = "0.5.3"
 edition = "2021"
 authors = ["Rebecca Turner <rbt@sent.as>"]
 description = "A git-worktree(1) manager"
