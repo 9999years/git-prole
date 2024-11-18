@@ -3,6 +3,7 @@
 
 use std::fmt::Debug;
 use std::path::Path;
+use std::path::PathBuf;
 
 use miette::IntoDiagnostic;
 use tracing::instrument;
@@ -71,4 +72,13 @@ where
 {
     #[expect(clippy::disallowed_methods)]
     fs_err::write(path, contents).into_diagnostic()
+}
+
+#[instrument(level = "trace")]
+pub fn read_dir<P>(path: P) -> miette::Result<fs_err::ReadDir>
+where
+    P: Into<PathBuf> + Debug,
+{
+    #[expect(clippy::disallowed_methods)]
+    fs_err::read_dir(path).into_diagnostic()
 }

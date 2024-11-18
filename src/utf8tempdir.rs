@@ -14,8 +14,8 @@ pub struct Utf8TempDir {
 }
 
 impl Utf8TempDir {
-    pub fn new() -> miette::Result<Self> {
-        let inner = tempfile::tempdir().into_diagnostic()?;
+    pub fn new(parent_dir: &Utf8PathBuf) -> miette::Result<Self> {
+        let inner = tempfile::tempdir_in(parent_dir).into_diagnostic()?;
         let path = inner.path().to_owned().try_into().into_diagnostic()?;
         Ok(Self {
             inner: Some(inner),

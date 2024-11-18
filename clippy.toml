@@ -63,6 +63,14 @@ path = "std::fs::read_to_string"
 reason = "Use git_prole::fs::read_to_string"
 
 [[disallowed-methods]]
+path = "fs_err::read_dir"
+reason = "Use git_prole::fs::read_dir"
+
+[[disallowed-methods]]
+path = "std::fs::read_dir"
+reason = "Use git_prole::fs::read_dir"
+
+[[disallowed-methods]]
 path = "fs_err::copy"
 reason = "Use git_prole::fs::copy"
 

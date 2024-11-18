@@ -211,7 +211,6 @@ where
         //     suffix removed
         //   - Otherwise just use the git dir path.
 
-        let tempdir = Utf8TempDir::new()?.into_path();
         // Tests:
         // - `convert_from_bare`
         // - `convert_bare_dot_git`
@@ -224,7 +223,13 @@ where
         let destination_name = destination
             .file_name()
             .ok_or_else(|| miette!("Destination has no basename: {destination}"))?;
+        let destination_parent = destination
+            .parent()
+            .ok_or_else(|| miette!("Destination has no parent: {destination}"))?
+            .to_path_buf();
         tracing::debug!(%destination, "Destination determined");
+
+        let tempdir = Utf8TempDir::new(&destination_parent)?.into_path();
 
         let default_branch = match opts.default_branch {
             // Tests:
@@ -550,6 +555,8 @@ where
         );
         tracing::info!("You may need to `cd .` to refresh your shell");
 
+        remove_tempdir_if_empty(&self.tempdir)?;
+
         Ok(())
     }
 
@@ -662,4 +669,32 @@ impl MainWorktreePlan {
     ) -> Utf8PathBuf {
         self.inner.destination(convert_plan).join(".git")
     }
+}
+
+fn remove_tempdir_if_empty(tempdir: &Utf8Path) -> miette::Result<()> {
+    let contents = fs::read_dir(tempdir)?.collect::<Vec<_>>();
+    // From `std::fs::read_dir` documentation:
+    // > Entries for the current and parent directories (typically . and ..) are skipped.
+    if !contents.is_empty() {
+        tracing::warn!(
+            "Temporary directory isn't empty: {}\n{}",
+            tempdir.display_path_cwd(),
+            display_dir_contents(&contents)
+        );
+    } else {
+        fs::remove_dir(tempdir)?;
+    }
+
+    Ok(())
+}
+
+fn display_dir_contents(contents: &[std::io::Result<fs_err::DirEntry>]) -> String {
+    format_bulleted_list(contents.iter().map(|item| {
+        match item {
+            Ok(entry) => entry.file_name().display_path_cwd(),
+            Err(error) => error
+                .if_supports_color(Stream::Stdout, |text| text.red())
+                .to_string(),
+        }
+    }))
 }

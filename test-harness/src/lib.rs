@@ -29,7 +29,7 @@ pub struct GitProle {
 
 impl GitProle {
     pub fn new() -> miette::Result<Self> {
-        let mut tempdir = Utf8TempDir::new()?;
+        let mut tempdir = Utf8TempDir::new(&Utf8PathBuf::from("./"))?;
 
         if std::env::var("KEEP_TEMP").is_ok() {
             tempdir.persist();
